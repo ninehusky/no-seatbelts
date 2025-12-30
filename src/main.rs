@@ -14,7 +14,7 @@ use rustc_errors::registry;
 use rustc_hash::FxHashMap;
 use rustc_session::config;
 
-use no_seatbelts::{UncheckedFunctionPass};
+use no_seatbelts::UncheckedFunctionPass;
 
 fn main() {
     let config = rustc_interface::Config {
@@ -22,7 +22,12 @@ fn main() {
         opts: config::Options::default(),
         crate_cfg: Vec::new(),
         crate_check_cfg: Vec::new(),
-        input: config::Input::File(std::env::args().nth(1).expect("pass a file path as argument").into()),
+        input: config::Input::File(
+            std::env::args()
+                .nth(1)
+                .expect("pass a file path as argument")
+                .into(),
+        ),
         output_dir: None,
         output_file: None,
         file_loader: None,
@@ -40,21 +45,17 @@ fn main() {
     };
     rustc_interface::run_compiler(config, |compiler| {
         let krate = rustc_interface::passes::parse(&compiler.sess);
-        rustc_interface::create_and_enter_global_ctxt(&compiler, krate, |tcx| {
-
+        rustc_interface::create_and_enter_global_ctxt(compiler, krate, |tcx| {
             let lint_pass = UncheckedFunctionPass {};
 
             for id in tcx.hir_free_items() {
                 let item = tcx.hir_item(id);
-                match item.kind {
-                    rustc_hir::ItemKind::Fn { ident, .. } => {
-                        let def_id = item.hir_id().owner.def_id;
-                        if tcx.hir_maybe_body_owned_by(def_id).is_some() {
-                            let body = tcx.optimized_mir(def_id.to_def_id());
-                            lint_pass.check_body(&tcx, body);
-                        }
+                if let rustc_hir::ItemKind::Fn { .. } = item.kind {
+                    let def_id = item.hir_id().owner.def_id;
+                    if tcx.hir_maybe_body_owned_by(def_id).is_some() {
+                        let body = tcx.optimized_mir(def_id.to_def_id());
+                        lint_pass.check_body(&tcx, body);
                     }
-                    _ => (),
                 }
             }
         });
