@@ -47,7 +47,7 @@ fn main() {
             for id in tcx.hir_free_items() {
                 let item = tcx.hir_item(id);
                 match item.kind {
-                    rustc_hir::ItemKind::Fn { ident, .. } => {
+                    rustc_hir::ItemKind::Fn { .. } => {
                         let def_id = item.hir_id().owner.def_id;
                         if tcx.hir_maybe_body_owned_by(def_id).is_some() {
                             let body = tcx.optimized_mir(def_id.to_def_id());

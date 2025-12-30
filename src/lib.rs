@@ -3,11 +3,11 @@
 use rustc_errors::LintDiagnostic;
 use rustc_fluent_macro::fluent_messages;
 use rustc_macros::{Diagnostic, LintDiagnostic, Subdiagnostic};
-use rustc_middle::mir::{Body, TerminatorKind};
+use rustc_middle::{mir::{Body, TerminatorKind}, ty::TyCtxt};
 use rustc_session::declare_lint;
 use rustc_span::Span;
 
-use crate::fluent_generated::no_seatbelts_boo_you_stink;
+use crate::diagnostics::{NoSeatbeltsDiag, PanicKind, Suggestion};
 
 extern crate rustc_errors;
 extern crate rustc_fluent_macro;
@@ -18,6 +18,8 @@ extern crate rustc_middle;
 extern crate rustc_session;
 extern crate rustc_span;
 
+mod diagnostics;
+
 declare_lint! {
     /// Suggests replacing panicking functions with their unsafe counterparts.
     pub UNCHECKED_UNWRAP,
@@ -25,33 +27,26 @@ declare_lint! {
     "suggest replacing `unwrap` with `unwrap_unchecked` to avoid panics"
 }
 
-// **Important:** Use CARGO_MANIFEST_DIR to make the path absolute
-fluent_messages! { "/Users/acheung/research/projects/no-seatbelts/locales/en-US.ftl" }
 
-// This macro should handle everything, but it doesn't.
-// #[derive(LintDiagnostic)]
-// #[diag(no_seatbelts_boo_you_stink)]
+use rustc_span::SpanSnippetError;
 
-pub struct UncheckedUnwrapSugg {
-    // no fields needed for a simple message
-    pub span: Span,
+fn make_unwrap_replacement(
+    tcx: TyCtxt<'_>,
+    span: Span,
+) -> Option<String> {
+    let sm = tcx.sess.source_map();
+    let snippet = sm.span_to_snippet(span).ok()?;
+
+    // some.unwrap() → unsafe { some.unwrap_unchecked() }
+    let new_call = snippet.replace(
+        "unwrap()",
+        "unwrap_unchecked()",
+    );
+
+    Some(format!("unsafe {{ {} }}", new_call))
 }
 
-impl<'a> rustc_errors::LintDiagnostic<'a, ()> for UncheckedUnwrapSugg {
-    fn decorate_lint<'b>(self, diag: &'b mut rustc_errors::Diag<'a, ()>) {
-        // let my_debug_msg: rustc_errors::DiagMessage = rustc_errors::DiagMessage::FluentIdentifier(
-        //     std::borrow::Cow::Borrowed("no_seatbelts_boo_you_stink"),
-        //     None,
-        // );
 
-        diag.primary_message("Consider using `unwrap_unchecked` if you are sure the value is `Some`.");
-    }
-}
-
-// Now, define a lint pass to implement the above lint.
-
-/// Suggests rewriting code which panics to unsafe
-/// variants which exhibit undefined behavior.
 pub struct UncheckedFunctionPass {}
 
 impl<'tcx> UncheckedFunctionPass {
@@ -77,17 +72,19 @@ impl<'tcx> UncheckedFunctionPass {
                             let hir_id =
                                 tcx.local_def_id_to_hir_id(body.source.def_id().expect_local());
                             let span = terminator.source_info.span;
-                            let msg = no_seatbelts_boo_you_stink;
-                            println!("message: {:?}", msg);
+
+                            if let Some(replacement) = make_unwrap_replacement(*tcx, span) {
                             tcx.emit_node_span_lint(
                                 UNCHECKED_UNWRAP,
                                 hir_id,
                                 span,
-                                UncheckedUnwrapSugg {
+                                NoSeatbeltsDiag {
                                     span,
-
-                                },
+                                    kind: PanicKind::Unwrap,
+                                    suggestion: Some(Suggestion::ReplaceCall { replacement }),
+                                }
                             );
+                        }
                         }
                     }
                 }
