@@ -1,12 +1,11 @@
+use rustc_errors::Applicability;
 use rustc_errors::{Diag, LintDiagnostic};
 use rustc_span::Span;
-use rustc_errors::Applicability;
-use rustc_span::SpanSnippetError;
-
 
 /// The *kind* of panic site we detected.
 /// This is the semantic core of no-seatbelts.
 #[derive(Copy, Clone, Debug)]
+#[allow(dead_code)]
 pub enum PanicKind {
     Unwrap,
     Expect,
@@ -17,33 +16,25 @@ pub enum PanicKind {
 /// A structured suggestion, à la Clippy.
 /// This is where the "intelligence" lives.
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub enum Suggestion {
     /// Replace the panicking call with an unchecked variant.
-    ReplaceCall {
-        replacement: String,
-    },
+    ReplaceCall { replacement: String },
 
     /// Insert `core::hint::assert_unchecked(cond)`
-    InsertAssertUnchecked {
-        condition: &'static str,
-    },
+    InsertAssertUnchecked { condition: &'static str },
 
     /// Guard with a normal runtime check.
-    GuardWithIf {
-        condition: &'static str,
-    },
+    GuardWithIf { condition: &'static str },
 }
 
 impl PanicKind {
     /// High-level explanation of the panic site.
     pub fn message(&self) -> &'static str {
         match self {
-            PanicKind::Unwrap | PanicKind::Expect =>
-                "This call may panic if the value is invalid.",
-            PanicKind::BoundsCheck =>
-                "This operation may panic due to an out-of-bounds access.",
-            PanicKind::DivByZero =>
-                "This operation may panic due to division by zero.",
+            PanicKind::Unwrap | PanicKind::Expect => "This call may panic if the value is invalid.",
+            PanicKind::BoundsCheck => "This operation may panic due to an out-of-bounds access.",
+            PanicKind::DivByZero => "This operation may panic due to division by zero.",
         }
     }
 }
@@ -87,5 +78,3 @@ impl<'a> LintDiagnostic<'a, ()> for NoSeatbeltsDiag {
         }
     }
 }
-
-
