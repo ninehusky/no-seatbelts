@@ -14,7 +14,7 @@ use rustc_errors::registry;
 use rustc_hash::FxHashMap;
 use rustc_session::config;
 
-use no_seatbelts::UncheckedFunctionPass;
+use no_seatbelts::PanicPass;
 
 fn main() {
     let config = rustc_interface::Config {
@@ -46,7 +46,10 @@ fn main() {
     rustc_interface::run_compiler(config, |compiler| {
         let krate = rustc_interface::passes::parse(&compiler.sess);
         rustc_interface::create_and_enter_global_ctxt(compiler, krate, |tcx| {
-            let lint_pass = UncheckedFunctionPass {};
+            let lint_pass = PanicPass::new(vec![
+                Box::new(no_seatbelts::CheckedFunctionDetector),
+                Box::new(no_seatbelts::DivByZeroDetector),
+            ]);
 
             for id in tcx.hir_free_items() {
                 let item = tcx.hir_item(id);

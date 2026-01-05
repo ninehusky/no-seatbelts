@@ -1,13 +1,7 @@
 #![feature(rustc_private)]
 
-use rustc_middle::{
-    mir::{Body, TerminatorKind},
-    ty::TyCtxt,
-};
+use rustc_middle::mir::Body;
 use rustc_session::declare_lint;
-use rustc_span::Span;
-
-use crate::diagnostics::{NoSeatbeltsDiag, PanicKind, Suggestion};
 
 extern crate rustc_errors;
 extern crate rustc_fluent_macro;
@@ -18,64 +12,56 @@ extern crate rustc_middle;
 extern crate rustc_session;
 extern crate rustc_span;
 
-mod diagnostics;
 mod detectors;
+mod diagnostics;
 mod semantics;
+
+pub use detectors::*;
 
 declare_lint! {
     /// Suggests replacing panicking functions with their unsafe counterparts.
-    pub UNCHECKED_UNWRAP,
+    pub PANIC_PASS,
     Warn,
-    "suggest replacing `unwrap` with `unwrap_unchecked` to avoid panics"
+    "Suggests replacing panic-checking code with its unsafe counterpart."
 }
 
-fn make_unwrap_replacement(tcx: TyCtxt<'_>, span: Span) -> Option<String> {
-    let sm = tcx.sess.source_map();
-    let snippet = sm.span_to_snippet(span).ok()?;
-
-    // some.unwrap() → unsafe { some.unwrap_unchecked() }
-    let new_call = snippet.replace("unwrap()", "unwrap_unchecked()");
-
-    Some(format!("unsafe {{ {} }}", new_call))
+pub struct PanicPass {
+    detectors: Vec<Box<dyn detectors::PanicDetector>>,
 }
 
-pub struct UncheckedFunctionPass {}
+impl<'tcx> PanicPass {
+    pub fn new(detectors: Vec<Box<dyn detectors::PanicDetector>>) -> Self {
+        Self { detectors }
+    }
 
-impl<'tcx> UncheckedFunctionPass {
     pub fn check_body(&self, tcx: &rustc_middle::ty::TyCtxt<'tcx>, body: &Body<'tcx>) {
         if !tcx.is_mir_available(body.source.def_id()) {
             return;
         }
         for bb in tcx.optimized_mir(body.source.def_id()).basic_blocks.iter() {
+            for statement in &bb.statements {
+                for detector in &self.detectors {
+                    if let Some(diag) = detector.detect_statement(*tcx, body, statement) {
+                        let hir_id =
+                            tcx.local_def_id_to_hir_id(body.source.def_id().expect_local());
+                        let span = statement.source_info.span;
+
+                        tcx.emit_node_span_lint(PANIC_PASS, hir_id, span, diag);
+                    }
+                }
+            }
             let terminator = &bb.terminator;
             if terminator.is_none() {
                 continue;
             }
             let terminator = terminator.as_ref().unwrap();
 
-            if let TerminatorKind::Call { func, .. } = &terminator.kind
-                && let Some((def_id, _)) = func.const_fn_def()
-            {
-                let called_path = tcx.def_path_str(def_id);
-                // look for `unwrap`.
-                let name = called_path.split("::").last().unwrap();
-                if name == "unwrap" {
-                    // emit a lint warning here suggesting `unwrap` -> `unwrap_unchecked`.
+            for detector in &self.detectors {
+                if let Some(diag) = detector.detect_terminator(*tcx, body, terminator) {
                     let hir_id = tcx.local_def_id_to_hir_id(body.source.def_id().expect_local());
                     let span = terminator.source_info.span;
 
-                    if let Some(replacement) = make_unwrap_replacement(*tcx, span) {
-                        tcx.emit_node_span_lint(
-                            UNCHECKED_UNWRAP,
-                            hir_id,
-                            span,
-                            NoSeatbeltsDiag {
-                                span,
-                                kind: PanicKind::Unwrap,
-                                suggestion: Some(Suggestion::ReplaceCall { replacement }),
-                            },
-                        );
-                    }
+                    tcx.emit_node_span_lint(PANIC_PASS, hir_id, span, diag);
                 }
             }
         }

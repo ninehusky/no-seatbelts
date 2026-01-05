@@ -1,9 +1,8 @@
 use rustc_middle::mir::TerminatorKind;
-use rustc_span::sym;
 
 use crate::{
     detectors::PanicDetector,
-    diagnostics::{NoSeatbeltsDiag, PanicKind, Suggestion},
+    diagnostics::{NoSeatbeltsDiag, PanicKind},
     semantics::checked_calls::get_replacement,
 };
 
@@ -13,7 +12,7 @@ impl PanicDetector for CheckedFunctionDetector {
     fn detect_terminator<'tcx>(
         &self,
         tcx: rustc_middle::ty::TyCtxt<'tcx>,
-        body: &rustc_middle::mir::Body<'tcx>,
+        _body: &rustc_middle::mir::Body<'tcx>,
         terminator: &rustc_middle::mir::Terminator<'tcx>,
     ) -> Option<NoSeatbeltsDiag> {
         let TerminatorKind::Call { func, fn_span, .. } = &terminator.kind else {
@@ -26,7 +25,7 @@ impl PanicDetector for CheckedFunctionDetector {
 
         Some(NoSeatbeltsDiag {
             span: *fn_span,
-            kind: PanicKind::Unwrap,
+            kind: PanicKind::CheckedFunction,
             suggestion: Some(suggestion),
         })
     }
