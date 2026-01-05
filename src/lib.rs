@@ -19,6 +19,8 @@ extern crate rustc_session;
 extern crate rustc_span;
 
 mod diagnostics;
+mod detectors;
+mod semantics;
 
 declare_lint! {
     /// Suggests replacing panicking functions with their unsafe counterparts.

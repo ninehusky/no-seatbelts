@@ -32,9 +32,9 @@ impl PanicKind {
     /// High-level explanation of the panic site.
     pub fn message(&self) -> &'static str {
         match self {
-            PanicKind::Unwrap | PanicKind::Expect => "This call may panic if the value is invalid.",
-            PanicKind::BoundsCheck => "This operation may panic due to an out-of-bounds access.",
-            PanicKind::DivByZero => "This operation may panic due to division by zero.",
+            PanicKind::Unwrap | PanicKind::Expect => "This call emits a panic check to see if the value is invalid.",
+            PanicKind::BoundsCheck => "This operation emits a panic check for out-of-bounds access.",
+            PanicKind::DivByZero => "This operation emits a panic check for division by zero.",
         }
     }
 }
@@ -55,7 +55,7 @@ impl<'a> LintDiagnostic<'a, ()> for NoSeatbeltsDiag {
                 Suggestion::ReplaceCall { replacement } => {
                     diag.span_suggestion(
                         self.span,
-                        "replace this call with its unchecked variant",
+                        "if you're sure you want to remove the check, replace this call with its unchecked variant",
                         replacement,
                         Applicability::MaybeIncorrect,
                     );
@@ -63,7 +63,7 @@ impl<'a> LintDiagnostic<'a, ()> for NoSeatbeltsDiag {
 
                 Suggestion::InsertAssertUnchecked { condition } => {
                     diag.note(format!(
-                        "You may insert `unsafe {{ core::hint::assert_unchecked({}) }}` before this operation.",
+                        "if you're sure you want to remove the check, `unsafe {{ core::hint::assert_unchecked({}) }}` before this operation.",
                         condition
                     ));
                 }
