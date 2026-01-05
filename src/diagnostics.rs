@@ -7,10 +7,10 @@ use rustc_span::Span;
 #[derive(Copy, Clone, Debug)]
 #[allow(dead_code)]
 pub enum PanicKind {
-    Unwrap,
-    Expect,
+    CheckedFunction,
     BoundsCheck,
     DivByZero,
+    RemByZero,
 }
 
 /// A structured suggestion, à la Clippy.
@@ -22,7 +22,7 @@ pub enum Suggestion {
     ReplaceCall { replacement: String },
 
     /// Insert `core::hint::assert_unchecked(cond)`
-    InsertAssertUnchecked { condition: &'static str },
+    InsertAssertUnchecked { condition: String },
 
     /// Guard with a normal runtime check.
     GuardWithIf { condition: &'static str },
@@ -32,9 +32,12 @@ impl PanicKind {
     /// High-level explanation of the panic site.
     pub fn message(&self) -> &'static str {
         match self {
-            PanicKind::Unwrap | PanicKind::Expect => "This call may panic if the value is invalid.",
-            PanicKind::BoundsCheck => "This operation may panic due to an out-of-bounds access.",
-            PanicKind::DivByZero => "This operation may panic due to division by zero.",
+            PanicKind::CheckedFunction => "A panic check is emitted by this function call.",
+            PanicKind::BoundsCheck => {
+                "This operation emits a panic check for out-of-bounds access."
+            }
+            PanicKind::DivByZero => "This operation emits a panic check for division by zero.",
+            PanicKind::RemByZero => "This operation emits a panic check for modulo by zero.",
         }
     }
 }
@@ -55,17 +58,19 @@ impl<'a> LintDiagnostic<'a, ()> for NoSeatbeltsDiag {
                 Suggestion::ReplaceCall { replacement } => {
                     diag.span_suggestion(
                         self.span,
-                        "replace this call with its unchecked variant",
+                        "if you're sure you want to remove the check, replace this call with its unchecked variant",
                         replacement,
                         Applicability::MaybeIncorrect,
                     );
                 }
 
                 Suggestion::InsertAssertUnchecked { condition } => {
-                    diag.note(format!(
-                        "You may insert `unsafe {{ core::hint::assert_unchecked({}) }}` before this operation.",
-                        condition
-                    ));
+                    diag.span_suggestion(
+                        self.span,
+                        "insert the assertion to avoid the panic check",
+                        format!("unsafe {{ core::hint::assert_unchecked({}); }}", condition),
+                        Applicability::MaybeIncorrect,
+                    );
                 }
 
                 Suggestion::GuardWithIf { condition } => {
