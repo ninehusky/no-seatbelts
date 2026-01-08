@@ -8,7 +8,7 @@ warning: A panic check is emitted by this function call.
 help: if you're sure you want to remove the check, replace this call with its unchecked variant
   |
 6 -     some.unwrap();
-6 +     some.unsafe { std::unwrap_unchecked() };
+6 +     some.unsafe { some.unwrap_unchecked() };
   |
 
 warning: 1 warning emitted

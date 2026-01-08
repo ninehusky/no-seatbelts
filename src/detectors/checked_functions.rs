@@ -1,4 +1,7 @@
-use rustc_middle::mir::TerminatorKind;
+use rustc_middle::{
+    mir::{Operand, TerminatorKind},
+    ty::TyCtxt,
+};
 
 use crate::{
     detectors::PanicDetector,
@@ -8,11 +11,37 @@ use crate::{
 
 pub struct CheckedFunctionDetector;
 
+fn extract_receiver_snippet<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    body: &rustc_middle::mir::Body<'tcx>,
+    terminator: &rustc_middle::mir::Terminator<'tcx>,
+) -> Option<String> {
+    let rustc_middle::mir::TerminatorKind::Call { args, .. } = &terminator.kind else {
+        return None;
+    };
+
+    // Method calls have the receiver as arg[0]
+    let receiver = match &args.get(0)?.node {
+        Operand::Copy(place) | Operand::Move(place) => place.local,
+        Operand::Constant(c) => return Some(c.to_string()),
+    };
+    // We only handle locals for now
+
+    let span = body.local_decls[receiver].source_info.span;
+
+    // Filter out compiler-generated spans
+    if span.is_dummy() {
+        return None;
+    }
+
+    tcx.sess.source_map().span_to_snippet(span).ok()
+}
+
 impl PanicDetector for CheckedFunctionDetector {
     fn detect_terminator<'tcx>(
         &self,
-        tcx: rustc_middle::ty::TyCtxt<'tcx>,
-        _body: &rustc_middle::mir::Body<'tcx>,
+        tcx: TyCtxt<'tcx>,
+        body: &rustc_middle::mir::Body<'tcx>,
         terminator: &rustc_middle::mir::Terminator<'tcx>,
     ) -> Option<NoSeatbeltsDiag> {
         let TerminatorKind::Call { func, fn_span, .. } = &terminator.kind else {
@@ -21,7 +50,8 @@ impl PanicDetector for CheckedFunctionDetector {
 
         let (def_id, _) = func.const_fn_def()?;
 
-        let suggestion = get_replacement(tcx, def_id)?;
+        let receiver = extract_receiver_snippet(tcx, body, terminator);
+        let suggestion = get_replacement(tcx, def_id, receiver)?;
 
         Some(NoSeatbeltsDiag {
             span: *fn_span,
