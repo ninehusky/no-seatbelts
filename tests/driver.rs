@@ -4,7 +4,24 @@ use std::path::PathBuf;
 
 use compiletest::common::Mode;
 
-fn run_mode(mode: &'static str) {
+#[derive(Debug)]
+struct Args {
+    bless: bool,
+}
+
+impl Args {
+    fn from_args() -> Self {
+        let mut bless = false;
+        for arg in std::env::args() {
+            if arg == "--bless" {
+                bless = true;
+            }
+        }
+        Self { bless }
+    }
+}
+
+fn run_mode(args: &Args, mode: &'static str) {
     let mut config = compiletest::Config::default();
     config.mode = Mode::Ui;
     config.src_base = PathBuf::from(format!("tests/{}", mode));
@@ -22,16 +39,15 @@ fn run_mode(mode: &'static str) {
     ));
     config.target_rustcflags = Some(flags.join(" "));
 
+    config.bless = args.bless;
     config.clean_rmeta();
-    config.bless = true;
     config.clean_rlib();
     config.strict_headers = true;
 
     compiletest::run_tests(&config);
 }
 
-#[test]
-fn compile_test() {
-    // run_mode("compile-fail");
-    run_mode("ui");
+fn main() {
+    let args = Args::from_args();
+    run_mode(&args, "ui");
 }
