@@ -1,0 +1,10 @@
+warning: This operation emits a panic check for modulo by zero.
+ --> $DIR/remainder.rs:9:14
+  |
+9 |     let _z = x % y;
+  |              ^^^^^ help: insert the assertion to avoid the panic check: `unsafe { core::hint::assert_unchecked(y != 0); }`
+  |
+  = note: `#[warn(panic_pass)]` on by default
+
+warning: 1 warning emitted
+
