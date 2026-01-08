@@ -1,14 +1,14 @@
 warning: A panic check is emitted by this function call.
- --> $DIR/call_unwrap.rs:6:5
+ --> $DIR/call_unreachable.rs:7:14
   |
-6 |     some.unwrap();
-  |     ^^^^^^^^^^^^^
+7 |         _ => unreachable!(),
+  |              ^^^^^^^^^^^^^^
   |
   = note: `#[warn(panic_pass)]` on by default
 help: if you're sure you want to remove the check, replace this call with its unchecked variant
   |
-6 -     some.unwrap();
-6 +     unsafe { some.unwrap_unchecked() };
+7 -         _ => unreachable!(),
+7 +         _ => unsafe { std::hint::unreachable_unchecked() },
   |
 
 warning: 1 warning emitted

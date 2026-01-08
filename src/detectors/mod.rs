@@ -7,9 +7,11 @@ use crate::diagnostics::NoSeatbeltsDiag;
 
 mod checked_functions;
 mod div_by_zero;
+mod explicit_panics;
 
 pub use checked_functions::CheckedFunctionDetector;
 pub use div_by_zero::DivByZeroDetector;
+pub use explicit_panics::ExplicitPanicDetector;
 
 pub trait PanicDetector {
     fn detect_terminator<'tcx>(

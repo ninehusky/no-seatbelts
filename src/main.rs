@@ -49,6 +49,7 @@ fn main() {
             let lint_pass = PanicPass::new(vec![
                 Box::new(no_seatbelts::CheckedFunctionDetector),
                 Box::new(no_seatbelts::DivByZeroDetector),
+                Box::new(no_seatbelts::ExplicitPanicDetector),
             ]);
 
             for id in tcx.hir_free_items() {
