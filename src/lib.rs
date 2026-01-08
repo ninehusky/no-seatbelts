@@ -60,9 +60,8 @@ impl<'tcx> PanicPass {
             for detector in &self.detectors {
                 if let Some(diag) = detector.detect_terminator(*tcx, body, terminator) {
                     let hir_id = tcx.local_def_id_to_hir_id(body.source.def_id().expect_local());
-                    let span = terminator.source_info.span;
 
-                    tcx.emit_node_span_lint(PANIC_PASS, hir_id, span, diag);
+                    tcx.emit_node_span_lint(PANIC_PASS, hir_id, diag.span, diag);
                 }
             }
         }

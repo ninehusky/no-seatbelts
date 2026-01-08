@@ -17,6 +17,13 @@ pub fn get_replacement(
         return Some(Suggestion::ReplaceCall {
             replacement: format!("unsafe {{ {}.unwrap_unchecked() }}", recv),
         });
+    } else if tcx.is_diagnostic_item(sym::unreachable_macro, def_id)
+        || tcx.is_diagnostic_item(sym::unreachable, def_id)
+    {
+        assert!(receiver.is_none());
+        return Some(Suggestion::ReplaceCall {
+            replacement: "unsafe { std::hint::unreachable_unchecked() }".to_string(),
+        });
     }
 
     None

@@ -43,6 +43,7 @@ impl PanicKind {
 }
 
 /// The *single* diagnostic used by no-seatbelts.
+#[derive(Clone, Debug)]
 pub struct NoSeatbeltsDiag {
     pub span: Span,
     pub kind: PanicKind,

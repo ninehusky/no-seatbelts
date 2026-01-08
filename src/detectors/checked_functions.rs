@@ -10,51 +10,8 @@ use crate::{
     semantics::checked_calls::get_replacement,
 };
 
-use rustc_hir::{
-    Expr, ExprKind,
-    intravisit::{Visitor, walk_expr},
-};
-
-struct MethodCallFinder {
-    call_span: Span,
-    result: Option<Span>,
-}
-
-impl<'hir> Visitor<'hir> for MethodCallFinder {
-    fn visit_expr(&mut self, expr: &'hir Expr<'hir>) {
-        if let ExprKind::MethodCall(..) = expr.kind {
-            if expr.span.contains(self.call_span) {
-                // Pick the smallest enclosing span
-                if self
-                    .result
-                    .map_or(true, |s| expr.span.hi() - expr.span.lo() < s.hi() - s.lo())
-                {
-                    self.result = Some(expr.span);
-                }
-            }
-        }
-
-        walk_expr(self, expr);
-    }
-}
 
 pub struct CheckedFunctionDetector;
-
-fn full_method_call_span_from_hir(
-    tcx: TyCtxt<'_>,
-    def_id: rustc_hir::def_id::LocalDefId,
-    call_span: Span,
-) -> Option<Span> {
-    let body = tcx.hir_body_owned_by(def_id);
-
-    let mut finder = MethodCallFinder {
-        call_span,
-        result: None,
-    };
-
-    finder.visit_body(body);
-    finder.result
-}
 
 fn extract_receiver_snippet<'tcx>(
     tcx: TyCtxt<'tcx>,
@@ -66,22 +23,18 @@ fn extract_receiver_snippet<'tcx>(
     };
 
     // Method calls have the receiver as arg[0]
-    let receiver = match &args.get(0)?.node {
+    let receiver = match &args.first()?.node {
         Operand::Copy(place) | Operand::Move(place) => place.local,
         Operand::Constant(c) => return None,
     };
     // We only handle locals for now
 
-    let span = full_method_call_span_from_hir(
-        tcx,
-        body.source.def_id().as_local()?,
-        body.local_decls[receiver].source_info.span,
-    )?;
+    let span = body.local_decls[receiver].source_info.span;
 
     // Filter out compiler-generated spans
-    if span.is_dummy() {
-        return None;
-    }
+    // if span.is_dummy() {
+    //     return None;
+    // }
 
     Some((span, tcx.sess.source_map().span_to_snippet(span).ok()?))
 }
@@ -93,17 +46,19 @@ impl PanicDetector for CheckedFunctionDetector {
         body: &rustc_middle::mir::Body<'tcx>,
         terminator: &rustc_middle::mir::Terminator<'tcx>,
     ) -> Option<NoSeatbeltsDiag> {
-        let TerminatorKind::Call { func, fn_span, .. } = &terminator.kind else {
+        let TerminatorKind::Call { func,  .. } = &terminator.kind else {
             return None;
         };
 
         let (def_id, _) = func.const_fn_def()?;
 
-        let (recv_span, recv_str) = extract_receiver_snippet(tcx, body, terminator)?;
+        let (_recv_span, recv_str) = extract_receiver_snippet(tcx, body, terminator)?;
+        let call_span = terminator.source_info.span.source_callsite();
+        let name = tcx.def_path_str(def_id);
         let suggestion = get_replacement(tcx, def_id, Some(recv_str))?;
 
         Some(NoSeatbeltsDiag {
-            span: recv_span,
+            span: call_span,
             kind: PanicKind::CheckedFunction,
             suggestion: Some(suggestion),
         })
