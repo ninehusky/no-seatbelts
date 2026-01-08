@@ -5,6 +5,9 @@ edition = "2024"
 
 [dependencies]
 
+[dev-dependencies]
+compiletest_rs = { version = "0.11", features = ["tmp"] }
+
 [package.metadata.rust-analyzer]
 rustc_private = true
 
