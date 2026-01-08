@@ -1,0 +1,15 @@
+warning: A panic check is emitted by this function call.
+ --> $DIR/explicit_panic.rs:2:5
+  |
+2 |     panic!("no!!!");
+  |     ^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(panic_pass)]` on by default
+help: if you're sure you want to remove the check, replace this call with its unchecked variant
+  |
+2 -     panic!("no!!!");
+2 +     unsafe { std::hint::unreachable_unchecked() };
+  |
+
+warning: 1 warning emitted
+

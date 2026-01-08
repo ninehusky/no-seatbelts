@@ -1,13 +1,9 @@
-use rustc_middle::{
-    mir::TerminatorKind,
-    ty::TyCtxt,
-};
+use rustc_middle::{mir::TerminatorKind, ty::TyCtxt};
 
 use crate::{
     detectors::PanicDetector,
     diagnostics::{NoSeatbeltsDiag, PanicKind, Suggestion},
 };
-
 
 pub struct ExplicitPanicDetector;
 
@@ -24,9 +20,8 @@ impl PanicDetector for ExplicitPanicDetector {
 
         let (def_id, _) = func.const_fn_def()?;
 
-        if tcx.lang_items().panic_fn()? == def_id {
+        if tcx.lang_items().panic_fn()? == def_id || tcx.lang_items().begin_panic_fn()? == def_id {
             let call_span = terminator.source_info.span.source_callsite();
-            let sm = tcx.sess.source_map();
 
             return Some(NoSeatbeltsDiag {
                 span: call_span,
