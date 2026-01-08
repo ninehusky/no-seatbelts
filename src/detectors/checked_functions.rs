@@ -10,7 +10,6 @@ use crate::{
     semantics::checked_calls::get_replacement,
 };
 
-
 pub struct CheckedFunctionDetector;
 
 fn extract_receiver_snippet<'tcx>(
@@ -25,7 +24,7 @@ fn extract_receiver_snippet<'tcx>(
     // Method calls have the receiver as arg[0]
     let receiver = match &args.first()?.node {
         Operand::Copy(place) | Operand::Move(place) => place.local,
-        Operand::Constant(c) => return None,
+        Operand::Constant(_) => return None,
     };
     // We only handle locals for now
 
@@ -46,7 +45,7 @@ impl PanicDetector for CheckedFunctionDetector {
         body: &rustc_middle::mir::Body<'tcx>,
         terminator: &rustc_middle::mir::Terminator<'tcx>,
     ) -> Option<NoSeatbeltsDiag> {
-        let TerminatorKind::Call { func,  .. } = &terminator.kind else {
+        let TerminatorKind::Call { func, .. } = &terminator.kind else {
             return None;
         };
 
@@ -54,7 +53,6 @@ impl PanicDetector for CheckedFunctionDetector {
 
         let (_recv_span, recv_str) = extract_receiver_snippet(tcx, body, terminator)?;
         let call_span = terminator.source_info.span.source_callsite();
-        let name = tcx.def_path_str(def_id);
         let suggestion = get_replacement(tcx, def_id, Some(recv_str))?;
 
         Some(NoSeatbeltsDiag {

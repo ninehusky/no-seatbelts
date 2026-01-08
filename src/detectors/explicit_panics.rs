@@ -11,7 +11,7 @@ impl PanicDetector for ExplicitPanicDetector {
     fn detect_terminator<'tcx>(
         &self,
         tcx: TyCtxt<'tcx>,
-        body: &rustc_middle::mir::Body<'tcx>,
+        _body: &rustc_middle::mir::Body<'tcx>,
         terminator: &rustc_middle::mir::Terminator<'tcx>,
     ) -> Option<NoSeatbeltsDiag> {
         let TerminatorKind::Call { func, .. } = &terminator.kind else {

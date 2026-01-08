@@ -22,27 +22,22 @@ impl Args {
 }
 
 fn run_mode(args: &Args, mode: &'static str) {
-    let mut config = compiletest::Config::default();
-    config.mode = Mode::Ui;
-    config.src_base = PathBuf::from(format!("tests/{}", mode));
-
-    // point to your driver binary, not rustc
-    config.rustc_path = std::env::current_dir()
-        .unwrap()
-        .join("target/debug/no-seatbelts");
-
-    // optional: extra rustc flags for library paths or sysroot
-    let mut flags = Vec::new();
-    flags.push(format!(
-        "-L {}/target/debug/deps",
-        std::env::current_dir().unwrap().display()
-    ));
-    config.target_rustcflags = Some(flags.join(" "));
-
-    config.bless = args.bless;
+    let config = compiletest::Config {
+        mode: Mode::Ui,
+        src_base: PathBuf::from(format!("tests/{}", mode)),
+        rustc_path: std::env::current_dir()
+            .unwrap()
+            .join("target/debug/no-seatbelts"),
+        target_rustcflags: Some(format!(
+            "-L {}/target/debug/deps",
+            std::env::current_dir().unwrap().display()
+        )),
+        bless: args.bless,
+        strict_headers: true,
+        ..Default::default()
+    };
     config.clean_rmeta();
     config.clean_rlib();
-    config.strict_headers = true;
 
     compiletest::run_tests(&config);
 }
