@@ -22,9 +22,9 @@ impl Args {
 }
 
 fn run_mode(args: &Args, mode: &'static str) {
-    let config = compiletest::Config {
+    let mut config = compiletest::Config {
         mode: Mode::Ui,
-        src_base: PathBuf::from(format!("tests/{}", mode)),
+        src_base: PathBuf::from(format!("crates/no-seatbelts/tests/{}", mode)),
         rustc_path: std::env::current_dir()
             .unwrap()
             .join("target/debug/no-seatbelts"),
@@ -36,6 +36,7 @@ fn run_mode(args: &Args, mode: &'static str) {
         strict_headers: true,
         ..Default::default()
     };
+    config.link_deps();
     config.clean_rmeta();
     config.clean_rlib();
 
