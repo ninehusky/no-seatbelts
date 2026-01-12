@@ -25,3 +25,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo run --bin compiletest_runner
+      - name: Build no-seatbelts
+        run: cargo build --bin no-seatbelts
+      - name: Run compiletests
+        run: cargo run --bin compiletest_runner
+
