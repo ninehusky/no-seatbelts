@@ -88,7 +88,7 @@ fn main() {
             ]);
 
             for free_id in tcx.hir_crate_items(()).free_items() {
-                let item = tcx.hir_item(id);
+                let item = tcx.hir_item(free_id);
                 if let rustc_hir::ItemKind::Fn { .. } = item.kind {
                     let def_id = item.hir_id().owner.def_id;
                     if tcx.hir_maybe_body_owned_by(def_id).is_some() {
