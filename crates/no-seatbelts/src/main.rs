@@ -87,10 +87,21 @@ fn main() {
                 Box::new(no_seatbelts::ExplicitPanicDetector),
             ]);
 
-            for id in tcx.hir_free_items() {
+            for free_id in tcx.hir_crate_items(()).free_items() {
                 let item = tcx.hir_item(id);
                 if let rustc_hir::ItemKind::Fn { .. } = item.kind {
                     let def_id = item.hir_id().owner.def_id;
+                    if tcx.hir_maybe_body_owned_by(def_id).is_some() {
+                        let body = tcx.optimized_mir(def_id.to_def_id());
+                        lint_pass.check_body(&tcx, body);
+                    }
+                }
+            }
+
+            for impl_id in tcx.hir_crate_items(()).impl_items() {
+                let impl_item = tcx.hir_impl_item(impl_id);
+                if let rustc_hir::ImplItemKind::Fn { .. } = impl_item.kind {
+                    let def_id = impl_item.hir_id().owner.def_id;
                     if tcx.hir_maybe_body_owned_by(def_id).is_some() {
                         let body = tcx.optimized_mir(def_id.to_def_id());
                         lint_pass.check_body(&tcx, body);
