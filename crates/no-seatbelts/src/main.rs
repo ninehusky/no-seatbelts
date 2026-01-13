@@ -50,8 +50,6 @@ fn main() {
         opts.error_format = error_format;
     }
 
-    println!("args no std: {}", args.no_std);
-
     if args.no_std {
         opts.cg.panic = Some(rustc_target::spec::PanicStrategy::Abort);
         args.rustc_args.push("-Zbuild-std=core".to_string());
