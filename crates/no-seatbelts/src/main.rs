@@ -9,6 +9,7 @@ extern crate rustc_hir;
 extern crate rustc_interface;
 extern crate rustc_session;
 extern crate rustc_span;
+extern crate rustc_target;
 
 use std::path::PathBuf;
 
@@ -25,6 +26,9 @@ pub struct NoSeatbeltsArgs {
 
     #[arg(long)]
     pub error_format: Option<String>,
+
+    #[arg(long)]
+    pub no_std: bool,
 
     #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
     pub rustc_args: Vec<String>,
@@ -44,6 +48,10 @@ fn main() {
             _ => panic!("unsupported error format: {}", format),
         };
         opts.error_format = error_format;
+    }
+
+    if args.no_std {
+        opts.cg.panic = Some(rustc_target::spec::PanicStrategy::Abort);
     }
 
     let config = rustc_interface::Config {
