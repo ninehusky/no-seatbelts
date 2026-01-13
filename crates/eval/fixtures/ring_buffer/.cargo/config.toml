@@ -1,0 +1,9 @@
+# .cargo/config.toml
+[target.i686-unknown-linux-gnu]
+linker = "i686-linux-gnu-gcc"
+
+[target.armv7-unknown-linux-gnueabihf]
+linker = "arm-linux-gnueabihf-gcc"
+
+[target.riscv32imac-unknown-none-elf]
+linker = "riscv-none-elf-gcc"

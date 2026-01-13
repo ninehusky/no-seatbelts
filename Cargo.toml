@@ -1,5 +1,5 @@
 [workspace]
-members = [
+members = ["crates/eval",
   "crates/no-seatbelts",
 ]
 resolver = "2"

@@ -1,0 +1,27 @@
+name: Eval
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ringbuffer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Build no-seatbelts
+        run: cargo build -p no-seatbelts --bin no-seatbelts
+
+      - name: Run ring_buffer eval (no_std)
+        run: >
+          cargo run
+          -p no-seatbelts
+          --bin no-seatbelts
+          --
+          ./crates/eval/fixtures/ring_buffer/src/lib.rs
+          --no-std
+          --error-format=json
