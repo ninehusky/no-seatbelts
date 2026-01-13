@@ -25,6 +25,9 @@ pub struct NoSeatbeltsArgs {
 
     #[arg(long)]
     pub error_format: Option<String>,
+
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    pub rustc_args: Vec<String>,
 }
 
 fn main() {
@@ -59,7 +62,7 @@ fn main() {
         override_queries: None,
         registry: registry::Registry::new(rustc_errors::codes::DIAGNOSTICS),
         make_codegen_backend: None,
-        expanded_args: Vec::new(),
+        expanded_args: args.rustc_args,
         ice_file: None,
         hash_untracked_state: None,
         using_internal_features: &rustc_driver::USING_INTERNAL_FEATURES,
