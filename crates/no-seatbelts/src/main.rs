@@ -10,24 +10,45 @@ extern crate rustc_interface;
 extern crate rustc_session;
 extern crate rustc_span;
 
+use std::path::PathBuf;
+
+use clap::Parser;
 use rustc_errors::registry;
 use rustc_hash::FxHashMap;
 use rustc_session::config;
 
 use no_seatbelts::PanicPass;
 
+#[derive(Parser)]
+pub struct NoSeatbeltsArgs {
+    pub input: PathBuf,
+
+    #[arg(long)]
+    pub error_format: Option<String>,
+}
+
 fn main() {
+    let args = NoSeatbeltsArgs::parse();
+    let mut opts = config::Options::default();
+
+    if let Some(format) = args.error_format {
+        let error_format = match format.as_str() {
+            "json" => config::ErrorOutputType::Json {
+                pretty: false,
+                json_rendered: rustc_errors::emitter::HumanReadableErrorType::Default,
+                color_config: rustc_errors::emitter::ColorConfig::Auto,
+            },
+            _ => panic!("unsupported error format: {}", format),
+        };
+        opts.error_format = error_format;
+    }
+
     let config = rustc_interface::Config {
         extra_symbols: vec![],
-        opts: config::Options::default(),
+        opts,
         crate_cfg: Vec::new(),
         crate_check_cfg: Vec::new(),
-        input: config::Input::File(
-            std::env::args()
-                .nth(1)
-                .expect("pass a file path as argument")
-                .into(),
-        ),
+        input: config::Input::File(args.input),
         output_dir: None,
         output_file: None,
         file_loader: None,

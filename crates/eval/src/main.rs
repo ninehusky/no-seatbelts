@@ -24,6 +24,7 @@ fn main() {
             "no-seatbelts",
             "--",
             args.src_path.to_str().unwrap(),
+            "--error-format=json",
         ])
         .output()
         .expect("failed to run no-seatbelts");
@@ -36,6 +37,4 @@ fn main() {
     }
 
     eprintln!("suggestions: {}", String::from_utf8_lossy(&output.stderr));
-
-    println!("baseline build succeeded");
 }

@@ -314,6 +314,7 @@ dependencies = [
 name = "no-seatbelts"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "compiletest_rs",
 ]
 
