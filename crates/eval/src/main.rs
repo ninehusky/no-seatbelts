@@ -11,7 +11,7 @@ use std::{
 use clap::Parser;
 use rustfix::{CodeFix, Filter, Suggestion};
 use std::process::Command;
-use tempfile::{TempDir, tempdir};
+use tempfile::TempDir;
 
 const TARGET: &str = "i686-unknown-linux-gnu";
 
@@ -140,7 +140,7 @@ fn apply_suggestions(suggestions: &Vec<Suggestion>) {
     }
 
     for (source_file, suggestions) in fixes {
-        let source = fs::read_to_string(&source_file).expect("Couldn't read source file");
+        let source = fs::read_to_string(source_file).expect("Couldn't read source file");
         let mut fix = CodeFix::new(&source);
         for suggestion in suggestions.iter() {
             if let Err(e) = fix.apply(suggestion) {
@@ -148,7 +148,7 @@ fn apply_suggestions(suggestions: &Vec<Suggestion>) {
             }
         }
         let fixes = fix.finish().expect("Failed to finish applying fixes");
-        fs::write(&source_file, fixes).expect("Couldn't write fixed source file");
+        fs::write(source_file, fixes).expect("Couldn't write fixed source file");
     }
 
     println!("applied {} fixes", suggestions.len());
@@ -230,10 +230,10 @@ fn main() {
     let fixed_dir = TempDir::new_in(&repo_root).expect("failed to create tempdir");
     let fixed_tmp = fixed_dir.path();
 
-    copy_dir_recursive(project_dir, &baseline_tmp).expect("failed to copy baseline project");
-    add_empty_workspace(&baseline_tmp.join("Cargo.toml"));
-    copy_dir_recursive(project_dir, &fixed_tmp).expect("failed to copy fixed project");
-    add_empty_workspace(&fixed_tmp.join("Cargo.toml"));
+    copy_dir_recursive(project_dir, baseline_tmp).expect("failed to copy baseline project");
+    add_empty_workspace(baseline_tmp.join("Cargo.toml"));
+    copy_dir_recursive(project_dir, fixed_tmp).expect("failed to copy fixed project");
+    add_empty_workspace(fixed_tmp.join("Cargo.toml"));
 
     // 3. In host, run no-seatbelts on fixed project
     let suggestions = run_no_seatbelts(&repo_root, fixed_tmp.join(relative_path).as_path());
@@ -244,19 +244,19 @@ fn main() {
 
     // (Entering Docker now)
     // 5. Compile both projects inside Docker
-    docker_compile(&repo_root, &baseline_tmp).unwrap();
-    docker_compile(&repo_root, &fixed_tmp).unwrap();
+    docker_compile(&repo_root, baseline_tmp).unwrap();
+    docker_compile(&repo_root, fixed_tmp).unwrap();
 
     // 6. Measure ELF sizes (host-side)
-    let baseline_size = get_size(&baseline_tmp);
-    let fixed_size = get_size(&fixed_tmp);
+    let baseline_size = get_size(baseline_tmp);
+    let fixed_size = get_size(fixed_tmp);
 
     // 7. Save fixed project
     let fixed_out = project_dir.with_file_name(format!(
         "{}-no-seatbelts-fixed",
         project_dir.file_name().unwrap().to_str().unwrap()
     ));
-    copy_dir_recursive(&fixed_tmp, &fixed_out).expect("failed to save fixed project");
+    copy_dir_recursive(fixed_tmp, &fixed_out).expect("failed to save fixed project");
 
     // 8. Report + exit
     println!("Fixed project saved to {}", fixed_out.display());
