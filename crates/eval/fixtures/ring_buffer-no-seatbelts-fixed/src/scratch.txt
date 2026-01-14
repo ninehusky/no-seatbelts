@@ -1,0 +1,5 @@
+ RUSTFLAGS="-C link-arg=-nostdlib" cargo build --release --target armv7-unknown-linux-gnueabihf
+
+ RUSTFLAGS="-C link-arg=-nostdlib" cargo build --release --target riscv32imac-unknown-none-elf
+
+ RUSTFLAGS="-C link-arg=-nostdlib" cargo build --release --target i686-unknown-linux-gnu
