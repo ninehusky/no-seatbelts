@@ -25,3 +25,12 @@ jobs:
           ./crates/eval/fixtures/ring_buffer/src/lib.rs
           --no-std
           --error-format=json
+      - name: Zip fixed project
+        run: |
+          zip -r ring_buffer_no_seatbelts_fixed.zip crates/eval/fixtures/ring_buffer-no-seatbelts-fixed
+
+      - name: Upload fixed project artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ring-buffer-no-seatbelts-fixed
+          path: ring_buffer_no_seatbelts_fixed.zip
