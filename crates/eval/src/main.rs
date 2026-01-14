@@ -1,9 +1,11 @@
 use std::{
+    collections::HashSet,
     fs,
     path::{Path, PathBuf},
 };
 
-use clap::Parser;
+use clap::{Parser, builder::Str};
+use rustfix::Filter;
 use std::process::Command;
 use tempfile::tempdir;
 
@@ -81,5 +83,19 @@ fn main() {
         panic!("cargo build failed.");
     }
 
-    eprintln!("suggestions: {}", String::from_utf8_lossy(&output.stderr));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let json_only: String = stderr
+        .lines()
+        .filter(|line| line.trim_start().starts_with('{'))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let mut error_codes: HashSet<String> = HashSet::default();
+    let suggestions =
+        rustfix::get_suggestions_from_json(&json_only, &error_codes, Filter::Everything)
+            .expect("failed to parse suggestions");
+
+    for suggestion in suggestions {
+        println!("Suggestion:\n{:?}", suggestion);
+    }
 }
