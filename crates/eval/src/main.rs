@@ -219,7 +219,6 @@ fn main() {
     let src_dir = crate_root.parent().expect("no src dir");
     let project_dir = src_dir.parent().expect("no project dir");
 
-    // without parents.
     let relative_path = crate_root
         .strip_prefix(project_dir)
         .expect("path not under project root");
@@ -236,29 +235,30 @@ fn main() {
     copy_dir_recursive(project_dir, &fixed_tmp).expect("failed to copy fixed project");
     add_empty_workspace(&fixed_tmp.join("Cargo.toml"));
 
-    // 5. In host, run no-seatbelts on fixed project
+    // 3. In host, run no-seatbelts on fixed project
     let suggestions = run_no_seatbelts(&repo_root, fixed_tmp.join(relative_path).as_path());
     apply_suggestions(&suggestions);
 
-    // n. Build Docker image (once)
-    // docker_build().expect("failed to build docker image");
+    // 4. Build Docker image (once)
+    docker_build().expect("failed to build docker image");
 
-    // 6. Compile both projects inside Docker
+    // (Entering Docker now)
+    // 5. Compile both projects inside Docker
     docker_compile(&repo_root, &baseline_tmp).unwrap();
     docker_compile(&repo_root, &fixed_tmp).unwrap();
 
-    // 7. Measure ELF sizes (host-side)
+    // 6. Measure ELF sizes (host-side)
     let baseline_size = get_size(&baseline_tmp);
     let fixed_size = get_size(&fixed_tmp);
 
-    // 8. Save fixed project
+    // 7. Save fixed project
     let fixed_out = project_dir.with_file_name(format!(
         "{}-no-seatbelts-fixed",
         project_dir.file_name().unwrap().to_str().unwrap()
     ));
     copy_dir_recursive(&fixed_tmp, &fixed_out).expect("failed to save fixed project");
 
-    // 9. Report + exit
+    // 8. Report + exit
     println!("Fixed project saved to {}", fixed_out.display());
     println!("Original size: {} bytes", baseline_size);
     println!("New size: {} bytes", fixed_size);
