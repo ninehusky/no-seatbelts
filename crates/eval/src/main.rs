@@ -22,6 +22,23 @@ pub struct EvalArgs {
     pub src_path: PathBuf,
 }
 
+fn ensure_docker_image() {
+    let in_ci = std::env::var("CI").is_ok();
+    let force = std::env::var("EVAL_FORCE_DOCKER_BUILD").is_ok();
+
+    if in_ci || force || !docker_image_exists("no-seatbelts-eval-env") {
+        docker_build().expect("Failed to build docker image.");
+    }
+}
+
+fn docker_image_exists(name: &str) -> bool {
+    Command::new("docker")
+        .args(["image", "inspect", name])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
 fn add_empty_workspace(cargo_toml: impl AsRef<Path>) {
     let mut f = OpenOptions::new()
         .append(true)
@@ -239,8 +256,8 @@ fn main() {
     let suggestions = run_no_seatbelts(&repo_root, fixed_tmp.join(relative_path).as_path());
     apply_suggestions(&suggestions);
 
-    // 4. Build Docker image (once)
-    docker_build().expect("failed to build docker image");
+    // 4. Build Docker image, if needed
+    ensure_docker_image();
 
     // (Entering Docker now)
     // 5. Compile both projects inside Docker
