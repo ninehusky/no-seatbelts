@@ -21,8 +21,11 @@ pub enum Suggestion {
     /// Replace the panicking call with an unchecked variant.
     ReplaceCall { replacement: String },
 
-    /// Insert `core::hint::assert_unchecked(cond)`
-    InsertAssertUnchecked { condition: String },
+    /// Insert `core::hint::assert_unchecked(cond)` before the expression.
+    WrapWithAssertUnchecked {
+        condition: String,
+        original_expression: String,
+    },
 
     /// Guard with a normal runtime check.
     GuardWithIf { condition: &'static str },
@@ -65,11 +68,19 @@ impl<'a> LintDiagnostic<'a, ()> for NoSeatbeltsDiag {
                     );
                 }
 
-                Suggestion::InsertAssertUnchecked { condition } => {
+                Suggestion::WrapWithAssertUnchecked {
+                    condition,
+                    original_expression,
+                } => {
+                    let replacement = format!(
+                        "unsafe {{ core::hint::assert_unchecked({}); {} }}",
+                        condition, original_expression
+                    );
+
                     diag.span_suggestion(
                         self.span,
-                        "insert the assertion to avoid the panic check",
-                        format!("unsafe {{ core::hint::assert_unchecked({}); }}", condition),
+                        "wrap the expression with an unchecked assertion to remove the panic check",
+                        replacement,
                         Applicability::MaybeIncorrect,
                     );
                 }
