@@ -5,6 +5,40 @@ pub struct DivByZeroDetector;
 use rustc_middle::mir::{BinOp, Rvalue, StatementKind};
 use rustc_span::{BytePos, Span};
 
+fn trim_unbalanced_parens(s: &str) -> String {
+    let mut balance = 0;
+    for c in s.chars() {
+        match c {
+            '(' => balance += 1,
+            ')' => balance -= 1,
+            _ => {}
+        }
+    }
+
+    // If balance >= 0, parens are balanced or under-closed: do nothing
+    if balance >= 0 {
+        return s.trim().to_string();
+    }
+
+    // balance < 0 => too many ')'
+    let mut trimmed = s.trim_end();
+    while balance < 0 {
+        if let Some(last) = trimmed.chars().last() {
+            if last == ')' {
+                trimmed = &trimmed[..trimmed.len() - last.len_utf8()];
+                balance += 1;
+                trimmed = trimmed.trim_end();
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    trimmed.to_string()
+}
+
 fn extract_rhs_span_of_assign(
     tcx: rustc_middle::ty::TyCtxt<'_>,
     statement: &rustc_middle::mir::Statement<'_>,
@@ -23,6 +57,7 @@ fn extract_rhs_span_of_assign(
     // We are *already* inside StatementKind::Assign, so we expect exactly one '='
     let eqs: Vec<_> = stmt_snippet.match_indices('=').collect();
     if eqs.len() != 1 {
+        println!("stmt_snippet: {}", stmt_snippet);
         return Some(stmt_span);
     }
 
@@ -38,6 +73,7 @@ fn extract_rhs_span_of_assign(
 
     // Must still look like a div/rem expression
     if !rhs_text.contains('/') && !rhs_text.contains('%') {
+        println!("done..");
         return None;
     }
 
@@ -92,13 +128,13 @@ impl PanicDetector for DivByZeroDetector {
                 let rhs_text =
                     if let Ok(snippet) = source_map.span_to_snippet(statement.source_info.span) {
                         // Extract just the denominator part - this is tricky and approximate
-                        if let Some(div_pos) = snippet.find('/') {
-                            snippet[div_pos + 1..].trim().to_string()
+                        trim_unbalanced_parens(if let Some(div_pos) = snippet.find('/') {
+                            snippet[div_pos + 1..].trim()
                         } else if let Some(rem_pos) = snippet.find('%') {
-                            snippet[rem_pos + 1..].trim().to_string()
+                            snippet[rem_pos + 1..].trim()
                         } else {
-                            format!("{:?}", rhs) // fallback to MIR
-                        }
+                            panic!("expected / or % in div/rem expression")
+                        })
                     } else {
                         format!("{:?}", rhs) // fallback to MIR
                     };

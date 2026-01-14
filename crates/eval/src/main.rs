@@ -117,4 +117,21 @@ fn main() {
         let fixes = fix.finish().expect("Failed to finish applying fixes");
         fs::write(&source_file, fixes).expect("Couldn't write fixed source file");
     }
+
+    println!("applied {} fixes", suggestions.len());
+
+    // now, compile the fixed project.
+    let output = Command::new("cargo")
+        .args(["build"])
+        .current_dir(tmp_path)
+        .output()
+        .expect("failed to run cargo build on fixed project");
+
+    if !output.status.success() {
+        eprintln!("stdout:\n{}", String::from_utf8_lossy(&output.stdout));
+        eprintln!("stderr:\n{}", String::from_utf8_lossy(&output.stderr));
+        panic!("cargo build failed after applying fixes.");
+    }
+
+    println!("project compiled successfully after applying fixes.");
 }
