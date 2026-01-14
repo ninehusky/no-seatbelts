@@ -2,7 +2,6 @@ use crate::{detectors::PanicDetector, diagnostics::Suggestion};
 
 pub struct DivByZeroDetector;
 
-use rustc_middle::mir::{BinOp, Rvalue, StatementKind};
 use rustc_span::{BytePos, Span};
 
 fn trim_unbalanced_parens(s: &str) -> String {
