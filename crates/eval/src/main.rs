@@ -2,14 +2,18 @@
 /// The project has to be `ring_buffer_smoketest` for now.
 use std::{
     collections::{HashMap, HashSet},
-    fs,
+    fs::{self, OpenOptions},
+    io::Write,
     path::{Path, PathBuf},
+    process::Output,
 };
 
 use clap::Parser;
 use rustfix::{CodeFix, Filter, Suggestion};
 use std::process::Command;
-use tempfile::tempdir;
+use tempfile::TempDir;
+
+const TARGET: &str = "i686-unknown-linux-gnu";
 
 #[derive(Debug, Parser)]
 #[command(name = "eval")]
@@ -18,26 +22,76 @@ pub struct EvalArgs {
     pub src_path: PathBuf,
 }
 
-fn compile_crate(project_dir: &Path) -> Result<PathBuf, ()> {
-    // copy the project to a temp dir
-    let mut command = Command::new("cargo");
+fn ensure_docker_image() {
+    let in_ci = std::env::var("CI").is_ok();
+    let force = std::env::var("EVAL_FORCE_DOCKER_BUILD").is_ok();
 
-    command.args(["build"]).current_dir(project_dir);
-    command.env("RUSTFLAGS", "-C link-arg=-nostdlib");
-    command.arg("--release");
+    if in_ci || force || !docker_image_exists("no-seatbelts-eval-env") {
+        docker_build().expect("Failed to build docker image.");
+    }
+}
 
-    let output = command
+fn docker_image_exists(name: &str) -> bool {
+    Command::new("docker")
+        .args(["image", "inspect", name])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+fn add_empty_workspace(cargo_toml: impl AsRef<Path>) {
+    let mut f = OpenOptions::new()
+        .append(true)
+        .open(cargo_toml)
+        .expect("open Cargo.toml");
+    writeln!(f, "\n[workspace]").expect("write [workspace]");
+}
+
+fn docker_compile(repo_root: &Path, project_dir: &Path) -> Result<(), ()> {
+    let rel = project_dir
+        .strip_prefix(repo_root)
+        .expect("project_dir not under repo_root");
+
+    run_in_docker(
+        repo_root,
+        &[
+            "cargo",
+            "build",
+            "--manifest-path",
+            &format!("/work/{}/Cargo.toml", rel.display()),
+            "--release",
+            "--target",
+            "i686-unknown-linux-gnu",
+        ],
+    );
+    Ok(())
+}
+
+fn run_in_docker(repo_root: &Path, args: &[&str]) -> Output {
+    let output = Command::new("docker")
+        .args([
+            "run",
+            "--rm",
+            "-e",
+            "RUSTFLAGS=-C link-arg=-nostdlib",
+            "-e",
+            "CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER=i686-linux-gnu-gcc",
+            "-e",
+            "AR=i686-linux-gnu-ar",
+            "-v",
+            &format!("{}:/work", repo_root.display()),
+            "no-seatbelts-eval-env",
+        ])
+        .args(args)
         .output()
-        .expect("failed to run cargo build on project");
-
+        .expect("failed to run docker command");
     if !output.status.success() {
         eprintln!("stdout:\n{}", String::from_utf8_lossy(&output.stdout));
         eprintln!("stderr:\n{}", String::from_utf8_lossy(&output.stderr));
-        return Err(());
+        panic!("docker command failed");
     }
 
-    let target_dir = project_dir.join("target").join("release");
-    Ok(target_dir)
+    output
 }
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
@@ -55,8 +109,9 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-fn run_no_seatbelts(entry: &Path) -> Vec<Suggestion> {
+fn run_no_seatbelts(repo_root: &Path, entry: &Path) -> Vec<Suggestion> {
     let output = Command::new("cargo")
+        .current_dir(repo_root)
         .args([
             "run",
             "-p",
@@ -71,7 +126,12 @@ fn run_no_seatbelts(entry: &Path) -> Vec<Suggestion> {
         .output()
         .expect("failed to run no-seatbelts");
 
+    if !output.status.success() {
+        panic!("no-seatbelts failed to run");
+    }
+
     let stderr = String::from_utf8_lossy(&output.stderr);
+
     let json_only: String = stderr
         .lines()
         .filter(|line| line.trim_start().starts_with('{'))
@@ -89,7 +149,7 @@ fn run_no_seatbelts(entry: &Path) -> Vec<Suggestion> {
 fn apply_suggestions(suggestions: &Vec<Suggestion>) {
     let mut fixes = HashMap::new();
     for suggestion in suggestions {
-        let file_name = suggestion.snippets[0].file_name.clone();
+        let file_name = &suggestion.snippets[0].file_name;
         fixes
             .entry(file_name)
             .or_insert_with(Vec::new)
@@ -97,22 +157,26 @@ fn apply_suggestions(suggestions: &Vec<Suggestion>) {
     }
 
     for (source_file, suggestions) in fixes {
-        let source = fs::read_to_string(&source_file).expect("Couldn't read source file");
+        let source = fs::read_to_string(source_file).expect("Couldn't read source file");
         let mut fix = CodeFix::new(&source);
         for suggestion in suggestions.iter() {
             if let Err(e) = fix.apply(suggestion) {
-                panic!("Failed to apply suggestion to {}: {}", source_file, e);
+                panic!("Failed to apply suggestion to {:?}: {}", source_file, e);
             }
         }
         let fixes = fix.finish().expect("Failed to finish applying fixes");
-        fs::write(&source_file, fixes).expect("Couldn't write fixed source file");
+        fs::write(source_file, fixes).expect("Couldn't write fixed source file");
     }
 
     println!("applied {} fixes", suggestions.len());
 }
 
 fn get_size(crate_root: &Path) -> u64 {
-    let target_dir = crate_root.join("target").join("release").join("deps");
+    let target_dir = crate_root
+        .join("target")
+        .join(TARGET)
+        .join("release")
+        .join("deps");
     let mut total_size = 0;
     for entry in fs::read_dir(target_dir).expect("failed to read target/release/deps") {
         let entry = entry.expect("failed to read entry");
@@ -122,6 +186,10 @@ fn get_size(crate_root: &Path) -> u64 {
             .unwrap()
             .contains("ring_buffer_smoketest")
         {
+            continue;
+        }
+        // make sure no file extension
+        if entry.path().extension().is_some() {
             continue;
         }
         let metadata = entry.metadata().expect("failed to get metadata");
@@ -135,66 +203,88 @@ fn get_size(crate_root: &Path) -> u64 {
     total_size
 }
 
+fn docker_build() -> Result<(), String> {
+    let status = Command::new("docker")
+        .args([
+            "build",
+            "-f",
+            "crates/eval/docker/Dockerfile",
+            "-t",
+            "no-seatbelts-eval-env",
+            ".",
+        ])
+        .status()
+        .map_err(|e| format!("Failed to run docker build: {}", e))?;
+
+    if !status.success() {
+        return Err("Failed to build docker image".to_string());
+    }
+
+    Ok(())
+}
+
 fn main() {
+    let repo_root = std::env::current_dir().expect("failed to get current dir");
     let args = EvalArgs::parse();
 
+    // 1. Identify project layout
     let crate_root = &args.src_path;
-
     if !crate_root.is_file() {
-        panic!("For now, we expect src_path to be src/lib.rs or src/main.rs");
+        panic!("expected src/lib.rs or src/main.rs");
     }
 
-    let src_dir = crate_root.parent().expect("failed to get parent dir");
-    let project_dir = src_dir.parent().expect("failed to get project dir");
+    let src_dir = crate_root.parent().expect("no src dir");
+    let project_dir = src_dir.parent().expect("no project dir");
 
-    let tmp = tempdir().expect("failed to create tempdir");
-    let tmp_path = tmp.path();
-
-    copy_dir_recursive(project_dir, tmp_path).expect("failed to copy project");
-
-    let relative_entry = crate_root
+    let relative_path = crate_root
         .strip_prefix(project_dir)
-        .expect("crate root should be under project root");
+        .expect("path not under project root");
 
-    let tmp_entry = tmp_path.join(relative_entry);
+    // 2. Prepare temp dirs (in host FS)
+    let baseline_dir = TempDir::new_in(&repo_root).expect("failed to create tempdir");
+    let baseline_tmp = baseline_dir.path();
 
-    if !tmp_entry.is_file() {
-        panic!(
-            "expected temp crate root file at {}, but it does not exist",
-            tmp_entry.display()
-        );
-    }
+    let fixed_dir = TempDir::new_in(&repo_root).expect("failed to create tempdir");
+    let fixed_tmp = fixed_dir.path();
 
-    let suggestions = run_no_seatbelts(&tmp_entry);
+    copy_dir_recursive(project_dir, baseline_tmp).expect("failed to copy baseline project");
+    add_empty_workspace(baseline_tmp.join("Cargo.toml"));
+    copy_dir_recursive(project_dir, fixed_tmp).expect("failed to copy fixed project");
+    add_empty_workspace(fixed_tmp.join("Cargo.toml"));
+
+    // 3. In host, run no-seatbelts on fixed project
+    let suggestions = run_no_seatbelts(&repo_root, fixed_tmp.join(relative_path).as_path());
     apply_suggestions(&suggestions);
 
-    let clone_of_project_dir = tempdir().expect("failed to create tempdir");
-    let clone_of_project_path = clone_of_project_dir.path();
-    copy_dir_recursive(project_dir, clone_of_project_path).expect("failed to copy project");
+    // 4. Build Docker image, if needed
+    ensure_docker_image();
 
-    // now, compile the fixed project.
-    compile_crate(clone_of_project_path).expect("failed to compile original project");
-    compile_crate(tmp_path).expect("failed to compile fixed project");
+    // (Entering Docker now)
+    // 5. Compile both projects inside Docker
+    docker_compile(&repo_root, baseline_tmp).unwrap();
+    docker_compile(&repo_root, fixed_tmp).unwrap();
 
-    // report the sizes of everything in target/release/deps
-    let og_size: u64 = get_size(clone_of_project_path);
-    let new_size: u64 = get_size(tmp_path);
+    // 6. Measure ELF sizes (host-side)
+    let baseline_size = get_size(baseline_tmp);
+    let fixed_size = get_size(fixed_tmp);
 
-    // finally, save the fixed project to a new location
-    let fixed_project_path = project_dir.with_file_name(format!(
+    // 7. Save fixed project
+    let fixed_out = project_dir.with_file_name(format!(
         "{}-no-seatbelts-fixed",
         project_dir.file_name().unwrap().to_str().unwrap()
     ));
+    copy_dir_recursive(fixed_tmp, &fixed_out).expect("failed to save fixed project");
 
-    copy_dir_recursive(tmp_path, &fixed_project_path)
-        .expect("failed to copy fixed project to final location");
-
-    println!("Fixed project saved to {}", fixed_project_path.display());
-
-    println!("Original size: {} bytes", og_size);
-    println!("New size: {} bytes", new_size);
+    // 8. Report + exit
+    println!("Fixed project saved to {}", fixed_out.display());
+    println!("Original size: {} bytes", baseline_size);
+    println!("New size: {} bytes", fixed_size);
     println!(
         "This shrunk the binary by {} bytes",
-        og_size as i64 - new_size as i64
+        baseline_size as i64 - fixed_size as i64
     );
+
+    if fixed_size >= baseline_size {
+        std::process::exit(1);
+    }
 }

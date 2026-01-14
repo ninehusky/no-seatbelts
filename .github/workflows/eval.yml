@@ -13,18 +13,13 @@ jobs:
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@nightly
 
-      - name: Build no-seatbelts
-        run: cargo build -p no-seatbelts --bin no-seatbelts
-
-      - name: Run ring_buffer eval (no_std)
+      - name: Run eval on ring_buffer
         run: >
           cargo run
-          -p no-seatbelts
-          --bin no-seatbelts
+          -p eval
           --
-          ./crates/eval/fixtures/ring_buffer/src/lib.rs
-          --no-std
-          --error-format=json
+          crates/eval/fixtures/ring_buffer/src/lib.rs
+
       - name: Zip fixed project
         run: |
           zip -r ring_buffer_no_seatbelts_fixed.zip crates/eval/fixtures/ring_buffer-no-seatbelts-fixed
