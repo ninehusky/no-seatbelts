@@ -27,3 +27,6 @@ target
 .DS_Store
 
 /target
+
+# Any folder with 'fixed' in the name.
+**/*fixed*/
