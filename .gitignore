@@ -30,3 +30,6 @@ target
 
 # Any folder with 'fixed' in the name.
 **/*fixed*/
+
+# Any folder containing .tmp in it.
+**/*.tmp*/
