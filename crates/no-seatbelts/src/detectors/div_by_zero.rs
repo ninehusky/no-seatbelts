@@ -57,7 +57,6 @@ fn extract_rhs_span_of_assign(
     // We are *already* inside StatementKind::Assign, so we expect exactly one '='
     let eqs: Vec<_> = stmt_snippet.match_indices('=').collect();
     if eqs.len() != 1 {
-        println!("stmt_snippet: {}", stmt_snippet);
         return Some(stmt_span);
     }
 
