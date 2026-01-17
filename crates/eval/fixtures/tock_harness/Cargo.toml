@@ -1,0 +1,13 @@
+[package]
+name = "tock_harness"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+capsules-core = { path = "/work/tock/capsules/core" }
+kernel = { path = "/work/tock/kernel" }
+
+[workspace]
+
+[profile.release]
+panic = "abort"
