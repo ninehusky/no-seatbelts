@@ -1,121 +1,22 @@
 /// This is a teeny Rust script which evaluates no-seatbelts on a given project.
 /// The project has to be `ring_buffer_smoketest` for now.
-use std::{
-    collections::{HashMap, HashSet},
-    fs::{self},
-    path::Path,
-};
+use std::fs::{self};
 
 use clap::Parser;
-use rustfix::{CodeFix, Filter, Suggestion};
-use std::process::Command;
 
-use crate::docker::ensure_docker_image;
-use crate::{binary_analysis::analyze_elf, docker::docker_compile};
+use crate::docker::{docker_compile, ensure_docker_image};
+use crate::metrics::binary::analyze_elf;
+use crate::metrics::size::get_size;
+use crate::noseatbelts::{apply_suggestions, run_no_seatbelts};
 use crate::{cli::EvalArgs, project::copy_dir_recursive};
 
-mod binary_analysis;
 mod cli;
 mod docker;
+mod metrics;
+mod noseatbelts;
 mod project;
 
 const TARGET: &str = "i686-unknown-linux-gnu";
-
-fn run_no_seatbelts(repo_root: &Path, entry: &Path) -> Vec<Suggestion> {
-    let output = Command::new("cargo")
-        .current_dir(repo_root)
-        .args([
-            "run",
-            "-p",
-            "no-seatbelts",
-            "--bin",
-            "no-seatbelts",
-            "--",
-            entry.to_str().unwrap(),
-            "--error-format=json",
-            "--no-std",
-        ])
-        .output()
-        .expect("failed to run no-seatbelts");
-
-    if !output.status.success() {
-        println!("stdout:\n{}", String::from_utf8_lossy(&output.stdout));
-        println!("stderr:\n{}", String::from_utf8_lossy(&output.stderr));
-        panic!("no-seatbelts failed to run");
-    }
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-
-    let json_only: String = stderr
-        .lines()
-        .filter(|line| line.trim_start().starts_with('{'))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    rustfix::get_suggestions_from_json(
-        &json_only,
-        &HashSet::<String>::default(),
-        Filter::Everything,
-    )
-    .expect("failed to parse suggestions")
-}
-
-fn apply_suggestions(suggestions: &Vec<Suggestion>) {
-    let mut fixes = HashMap::new();
-    for suggestion in suggestions {
-        let file_name = &suggestion.snippets[0].file_name;
-        fixes
-            .entry(file_name)
-            .or_insert_with(Vec::new)
-            .push(suggestion);
-    }
-
-    for (source_file, suggestions) in fixes {
-        let source = fs::read_to_string(source_file).expect("Couldn't read source file");
-        let mut fix = CodeFix::new(&source);
-        for suggestion in suggestions.iter() {
-            if let Err(e) = fix.apply(suggestion) {
-                panic!("Failed to apply suggestion to {:?}: {}", source_file, e);
-            }
-        }
-        let fixes = fix.finish().expect("Failed to finish applying fixes");
-        fs::write(source_file, fixes).expect("Couldn't write fixed source file");
-    }
-
-    println!("applied {} fixes", suggestions.len());
-}
-
-fn get_size(crate_root: &Path) -> u64 {
-    let target_dir = crate_root
-        .join("target")
-        .join(TARGET)
-        .join("release")
-        .join("deps");
-    let mut total_size = 0;
-    for entry in fs::read_dir(target_dir).expect("failed to read target/release/deps") {
-        let entry = entry.expect("failed to read entry");
-        if !entry
-            .file_name()
-            .to_str()
-            .unwrap()
-            .contains("ring_buffer_smoketest")
-        {
-            continue;
-        }
-        // make sure no file extension
-        if entry.path().extension().is_some() {
-            continue;
-        }
-        let metadata = entry.metadata().expect("failed to get metadata");
-        total_size += metadata.len();
-    }
-    if total_size == 0 {
-        panic!(
-            "failed to find binary in target/release/deps. Are you calling get_size on ring_buffer_smoketest?"
-        );
-    }
-    total_size
-}
 
 fn main() {
     let repo_root = std::env::current_dir().expect("failed to get current dir");
