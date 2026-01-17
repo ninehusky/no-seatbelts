@@ -29,10 +29,10 @@ pub fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 }
 
 pub fn prepare_temp_projects(repo_root: &Path, project_dir: &Path) -> (TempDir, TempDir) {
-    let baseline_dir = TempDir::new_in(&repo_root).expect("failed to create tempdir");
+    let baseline_dir = TempDir::new_in(repo_root).expect("failed to create tempdir");
     let baseline_tmp = baseline_dir.path();
 
-    let fixed_dir = TempDir::new_in(&repo_root).expect("failed to create tempdir");
+    let fixed_dir = TempDir::new_in(repo_root).expect("failed to create tempdir");
     let fixed_tmp = fixed_dir.path();
 
     copy_dir_recursive(project_dir, baseline_tmp).expect("failed to copy baseline project");

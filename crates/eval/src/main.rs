@@ -8,10 +8,7 @@ use crate::docker::{docker_compile, ensure_docker_image};
 use crate::metrics::binary::analyze_elf;
 use crate::metrics::size::get_size;
 use crate::noseatbelts::{apply_suggestions, run_no_seatbelts};
-use crate::{
-    cli::EvalArgs,
-    project::{copy_dir_recursive, find_elf},
-};
+use crate::{cli::EvalArgs, project::copy_dir_recursive};
 
 mod cli;
 mod docker;
@@ -19,6 +16,7 @@ mod metrics;
 mod noseatbelts;
 mod project;
 
+#[allow(dead_code)]
 const TARGET: &str = "i686-unknown-linux-gnu";
 
 fn main() {
@@ -72,20 +70,20 @@ fn main() {
 
     // (Entering Docker now)
     // 5. Compile both projects inside Docker
-    docker_compile(&repo_root, &baseline_path).unwrap();
-    docker_compile(&repo_root, &fixed_path).unwrap();
+    docker_compile(&repo_root, baseline_path).unwrap();
+    docker_compile(&repo_root, fixed_path).unwrap();
 
     // 6. Measure ELF sizes (host-side)
     println!("exists? {}", baseline_path.exists());
-    let baseline_size = get_size(&baseline_path);
-    let fixed_size = get_size(&fixed_path);
+    let baseline_size = get_size(baseline_path);
+    let fixed_size = get_size(fixed_path);
 
     // 7. Save fixed project
     let fixed_out = project_dir.with_file_name(format!(
         "{}-no-seatbelts-fixed",
         project_dir.file_name().unwrap().to_str().unwrap()
     ));
-    copy_dir_recursive(&fixed_path, &fixed_out).expect("failed to save fixed project");
+    copy_dir_recursive(fixed_path, &fixed_out).expect("failed to save fixed project");
 
     // 8. Report + exit
     println!("Fixed project saved to {}", fixed_out.display());
@@ -102,5 +100,5 @@ fn main() {
 
     // 9. Analyze ELF binaries.
     println!("exists? {}", baseline_path.exists());
-    analyze_elf(&repo_root, &baseline_path);
+    analyze_elf(&repo_root, baseline_path);
 }

@@ -6,6 +6,7 @@ use rustc_demangle::demangle;
 use crate::{docker::run_in_docker, project::find_elf};
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct FunctionAsm {
     /// The name of the function.
     name: String,
@@ -23,7 +24,7 @@ pub struct FunctionAsm {
 pub fn analyze_elf(repo_root: &Path, elf_root: &Path) {
     let elf_path = find_elf(elf_root);
     let rel = elf_path
-        .strip_prefix(&repo_root)
+        .strip_prefix(repo_root)
         .expect("ELF not under repo root");
     let docker_elf_path = format!("/work/{}", rel.display());
 
@@ -69,10 +70,8 @@ fn extract_functions(asm: &str) -> Vec<(String, Vec<String>)> {
             continue;
         }
 
-        if asm_line.is_match(line) {
-            if current_name.is_some() {
-                current_asm.push(line.to_string());
-            }
+        if asm_line.is_match(line) && current_name.is_some() {
+            current_asm.push(line.to_string());
         }
     }
 
