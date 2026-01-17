@@ -8,7 +8,10 @@ use crate::docker::{docker_compile, ensure_docker_image};
 use crate::metrics::binary::analyze_elf;
 use crate::metrics::size::get_size;
 use crate::noseatbelts::{apply_suggestions, run_no_seatbelts};
-use crate::{cli::EvalArgs, project::copy_dir_recursive};
+use crate::{
+    cli::EvalArgs,
+    project::{copy_dir_recursive, find_elf},
+};
 
 mod cli;
 mod docker;
@@ -73,6 +76,7 @@ fn main() {
     docker_compile(&repo_root, &fixed_path).unwrap();
 
     // 6. Measure ELF sizes (host-side)
+    println!("exists? {}", baseline_path.exists());
     let baseline_size = get_size(&baseline_path);
     let fixed_size = get_size(&fixed_path);
 
@@ -97,5 +101,6 @@ fn main() {
     }
 
     // 9. Analyze ELF binaries.
-    analyze_elf(&baseline_path);
+    println!("exists? {}", baseline_path.exists());
+    analyze_elf(&repo_root, &baseline_path);
 }

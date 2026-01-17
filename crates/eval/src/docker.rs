@@ -25,6 +25,8 @@ pub fn docker_compile(repo_root: &Path, project_dir: &Path) -> Result<(), ()> {
             "--manifest-path",
             &format!("/work/{}/Cargo.toml", rel.display()),
             "--release",
+            "--bin",
+            "ring-buffer-smoketest",
             "--target",
             "i686-unknown-linux-gnu",
         ],

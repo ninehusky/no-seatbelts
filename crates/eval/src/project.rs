@@ -50,3 +50,30 @@ pub fn prepare_temp_projects(repo_root: &Path, project_dir: &Path) -> (TempDir, 
 
     (baseline_dir, fixed_dir)
 }
+
+pub fn find_elf(project_dir: &Path) -> std::path::PathBuf {
+    let target_dir = project_dir
+        .join("target")
+        .join("i686-unknown-linux-gnu")
+        .join("release");
+    for entry in fs::read_dir(target_dir).expect("failed to read target/release/deps") {
+        let entry = entry.expect("failed to read entry");
+        if !entry
+            .file_name()
+            .to_str()
+            .unwrap()
+            .contains("ring-buffer-smoketest")
+        {
+            continue;
+        }
+        // make sure no file extension
+        if entry.path().extension().is_some() {
+            continue;
+        }
+        println!("found ELF at {}", entry.path().display());
+        return entry.path();
+    }
+    panic!(
+        "failed to find binary in target/release/deps. Are you calling find_elf on ring_buffer_smoketest?"
+    );
+}
