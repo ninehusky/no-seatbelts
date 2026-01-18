@@ -151,41 +151,42 @@ pub fn analyze_elf(repo_root: &Path, elf_root: &Path) -> ElfAnalysis {
         let is_panic_root = is_panic_root(&demangled);
 
         if is_panic_root {
+            // We don't care about the internals of panic root functions, other than their size.
             panic_roots.push(PanicRootInfo::new(demangled.clone(), func_bytes));
-        }
+        } else {
+            for (i, instr) in instrs.iter().enumerate() {
+                let instr_size = instruction_size(&instrs, i);
 
-        for (i, instr) in instrs.iter().enumerate() {
-            let instr_size = instruction_size(&instrs, i);
+                total_bytes += instr_size;
+                num_instructions += 1;
 
-            total_bytes += instr_size;
-            num_instructions += 1;
+                if let Some(panic_callee) = is_panic_call(&instr.text) {
+                    println!(
+                        "PANIC CALL: caller={}, size={}, text={}",
+                        demangled, instr_size, instr.text
+                    );
+                    num_panic_calls += 1;
+                    panic_call_bytes += instr_size;
 
-            if let Some(panic_callee) = is_panic_call(&instr.text) {
-                println!(
-                    "PANIC CALL: caller={}, size={}, text={}",
-                    demangled, instr_size, instr.text
-                );
-                num_panic_calls += 1;
-                panic_call_bytes += instr_size;
-
-                panic_call_sites.push(PanicCallSiteInfo {
-                    caller: demangled.clone(),
-                    callee: panic_callee,
-                    call_size_bytes: instr_size,
-                });
+                    panic_call_sites.push(PanicCallSiteInfo {
+                        caller: demangled.clone(),
+                        callee: panic_callee,
+                        call_size_bytes: instr_size,
+                    });
+                }
             }
-        }
 
-        function_asms.push(FunctionAsm {
-            name: demangled,
-            body,
-            crate_name: None,
-            total_bytes,
-            num_instructions,
-            is_panic_root,
-            num_panic_calls,
-            panic_call_bytes,
-        });
+            function_asms.push(FunctionAsm {
+                name: demangled,
+                body,
+                crate_name: None,
+                total_bytes,
+                num_instructions,
+                is_panic_root,
+                num_panic_calls,
+                panic_call_bytes,
+            });
+        }
     }
 
     // Now, aggregate the results
