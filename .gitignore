@@ -33,3 +33,6 @@ target
 
 # Any folder containing .tmp in it.
 **/*.tmp*/
+
+# eval/fixutres/eval-runs
+crates/eval/fixtures/eval-runs/

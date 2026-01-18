@@ -16,6 +16,8 @@ mod metrics;
 mod noseatbelts;
 mod project;
 
+use chrono::Utc;
+
 #[allow(dead_code)]
 const TARGET: &str = "i686-unknown-linux-gnu";
 
@@ -94,11 +96,52 @@ fn main() {
         baseline_size as i64 - fixed_size as i64
     );
 
-    if fixed_size >= baseline_size {
-        std::process::exit(1);
-    }
+    assert!(fixed_size <= baseline_size, "fixed binary is not smaller!");
 
     // 9. Analyze ELF binaries.
-    println!("exists? {}", baseline_path.exists());
-    analyze_elf(&repo_root, baseline_path);
+    println!("BASELINE: ");
+    let baseline_summary = analyze_elf(&repo_root, baseline_path);
+    println!("{}", baseline_summary);
+    println!("FIXED: ");
+    let fixed_summary = analyze_elf(&repo_root, fixed_path);
+    println!("{}", fixed_summary);
+
+    let datetime_id = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+    let final_folder = project_dir
+        .with_file_name("eval-runs")
+        .join(datetime_id.to_string());
+    fs::create_dir_all(&final_folder).expect("failed to create eval-runs folder");
+
+    let final_baseline = final_folder.join("baseline");
+    copy_dir_recursive(baseline_path, &final_baseline).expect("failed to save baseline project");
+
+    let final_fixed = final_folder.join("fixed");
+    copy_dir_recursive(fixed_path, &final_fixed).expect("failed to save fixed project");
+
+    let base_fn_info = baseline_summary.functions;
+    let fixed_fn_info = fixed_summary.functions;
+
+    let mut fixed_panics_total = 0;
+    let mut base_panics_total = 0;
+    for (fn_name, base_info) in base_fn_info.iter() {
+        let fixed_info = fixed_fn_info
+            .get(fn_name)
+            .expect("function missing in fixed binary");
+        fixed_panics_total += fixed_info.num_panic_calls;
+        base_panics_total += base_info.num_panic_calls;
+        println!(
+            "Function: {}\n  Panic calls (base): {}\n  Panic calls(fixed): {}\n  Baseline size: {} bytes\n  Fixed size: {} bytes\n  Delta: {} bytes\n",
+            fn_name,
+            base_info.num_panic_calls,
+            fixed_info.num_panic_calls,
+            base_info.total_bytes,
+            fixed_info.total_bytes,
+            base_info.total_bytes as i64 - fixed_info.total_bytes as i64
+        );
+    }
+
+    println!("Total panic calls in baseline: {}", base_panics_total);
+    println!("Total panic calls in fixed: {}", fixed_panics_total);
+
+    println!("saved eval run to {}", final_folder.display());
 }
