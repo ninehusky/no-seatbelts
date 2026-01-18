@@ -161,7 +161,10 @@ pub fn analyze_elf(repo_root: &Path, elf_root: &Path) -> ElfAnalysis {
             num_instructions += 1;
 
             if let Some(panic_callee) = is_panic_call(&instr.text) {
-                println!("PANIC CALL: size={}, text={}", instr_size, instr.text);
+                println!(
+                    "PANIC CALL: callee={}, size={}, text={}",
+                    panic_callee, instr_size, instr.text
+                );
                 num_panic_calls += 1;
                 panic_call_bytes += instr_size;
 
