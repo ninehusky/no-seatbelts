@@ -303,36 +303,6 @@ struct Instr {
     text: String,
 }
 
-fn parse_instr_line(line: &str) -> Option<Instr> {
-    // Trim leading whitespace
-    let line = line.trim_start();
-
-    // Split once at ':'
-    let (addr_str, rest) = line.split_once(':')?;
-
-    // Parse hex address
-    let addr = u64::from_str_radix(addr_str, 16).ok()?;
-
-    Some(Instr {
-        addr,
-        text: rest.trim().to_string(),
-    })
-}
-
-fn byte_len_from_text(text: &str) -> usize {
-    // Split on ':' to remove the address part
-    let after_colon = match text.split_once(':') {
-        Some((_, rest)) => rest,
-        None => return 0,
-    };
-
-    // Count consecutive hex byte tokens
-    after_colon
-        .split_whitespace()
-        .take_while(|tok| tok.len() == 2 && tok.chars().all(|c| c.is_ascii_hexdigit()))
-        .count()
-}
-
 fn instruction_size(instrs: &[Instr], i: usize) -> usize {
     if i + 1 < instrs.len() {
         (instrs[i + 1].addr - instrs[i].addr) as usize

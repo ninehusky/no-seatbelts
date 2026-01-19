@@ -60,7 +60,7 @@ harness_fn!(call_remove_first_matching, |buf: &mut RingBuffer<i32>| {
 });
 
 harness_fn!(call_retain, |buf: &mut RingBuffer<i32>| {
-    black_box(buf.retain(|&x: &i32| black_box(x) % black_box(2) == 0));
+    black_box(buf.retain(|&x: &i32| black_box(x) * black_box(2) == 0));
 });
 
 harness_fn!(call_empty, |buf: &mut RingBuffer<i32>| {
