@@ -15,8 +15,6 @@ mod metrics;
 mod noseatbelts;
 mod project;
 
-use chrono::Utc;
-
 #[allow(dead_code)]
 const TARGET: &str = "i686-unknown-linux-gnu";
 
@@ -87,12 +85,8 @@ fn main() {
     println!("Fixed project saved to {}", fixed_out.display());
 
     // 9. Analyze ELF binaries.
-    println!("BASELINE: ");
     let baseline_summary = analyze_elf(&repo_root, baseline_path);
-    println!("{}", baseline_summary);
-    println!("FIXED: ");
     let fixed_summary = analyze_elf(&repo_root, fixed_path);
-    println!("{}", fixed_summary);
 
     let datetime_id = chrono::Utc::now().format("%Y%m%d-%H%M%S");
     let final_folder = project_dir
@@ -106,8 +100,30 @@ fn main() {
     let final_fixed = final_folder.join("fixed");
     copy_dir_recursive(fixed_path, &final_fixed).expect("failed to save fixed project");
 
-    // build the report.
+    // 10. Build the report.
     let report_path = final_folder.join("panic-report.json");
+    let asm_path = final_folder.join("asm-dumps");
+    fs::create_dir_all(&asm_path).expect("failed to create asm-dumps folder");
+
+    for fn_name in baseline_summary.functions.keys() {
+        let fn_file_name = fn_name.replace("<", "_").replace(">", "_");
+        let fn_path = asm_path.join(fn_name.clone());
+        fs::create_dir_all(&fn_path).expect("failed to create function asm folder");
+        let baseline_asm_path = fn_path.join(format!("baseline-{}.asm", fn_file_name));
+        let fixed_asm_path = fn_path.join(format!("fixed-{}.asm", fn_file_name));
+
+        if let Some(fn_asm) = baseline_summary.functions.get(fn_name) {
+            fs::write(&baseline_asm_path, &fn_asm.body)
+                .expect("failed to write baseline function asm");
+        }
+
+        if let Some(fn_asm) = fixed_summary.functions.get(fn_name) {
+            fs::write(&fixed_asm_path, &fn_asm.body).expect("failed to write fixed function asm");
+        } else {
+            fs::write(&fixed_asm_path, "// Function removed in fixed build")
+                .expect("failed to write fixed function asm");
+        }
+    }
 
     metrics::report::write_panic_report(
         &report_path,

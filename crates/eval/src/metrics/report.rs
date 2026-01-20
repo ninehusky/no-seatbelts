@@ -4,10 +4,7 @@ use std::{fmt::Display, path::Path};
 
 use serde::Serialize;
 
-use crate::metrics::{
-    binary::ElfAnalysis,
-    size::{SectionSizes, SizeReport},
-};
+use crate::metrics::{binary::ElfAnalysis, size::SizeReport};
 
 #[derive(Serialize)]
 pub struct PanicReport {
@@ -177,7 +174,7 @@ fn build_panic_report(
 
     let diff = GlobalPanicDiff {
         removed_panic_calls: removed_panic_call_sites,
-        removed_panic_functions: removed_panic_functions,
+        removed_panic_functions,
     };
 
     let size_diff = SizeDiff {

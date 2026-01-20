@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{collections::BTreeMap, path::Path};
 
 use serde::Serialize;
 
@@ -14,12 +14,6 @@ pub struct SizeReport {
 #[derive(Debug, Clone, Serialize)]
 pub struct SectionSizes {
     pub sections: BTreeMap<String, u64>,
-}
-
-impl SectionSizes {
-    pub fn get(&self, name: &str) -> Option<u64> {
-        self.sections.get(name).cloned()
-    }
 }
 
 #[derive(Debug, Clone, Serialize)]

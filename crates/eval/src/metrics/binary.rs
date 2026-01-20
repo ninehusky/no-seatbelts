@@ -25,7 +25,6 @@ impl Display for ElfAnalysis {
 }
 
 struct Instr {
-    addr: u64,
     text: String,
 }
 
@@ -38,6 +37,7 @@ pub struct FunctionAsm {
     pub body: String,
 
     /// Optional crate attribution.
+    #[allow(dead_code)]
     pub crate_name: Option<String>,
 
     /// Whether this function is a known panic root.
@@ -69,7 +69,6 @@ pub fn analyze_elf(repo_root: &Path, elf_root: &Path) -> ElfAnalysis {
             .collect::<Vec<String>>()
             .join("\n");
         let demangled = demangle(&fn_name).to_string();
-        let mut num_instructions = 0usize;
 
         let is_panic_root = is_panic_root(&demangled);
 
@@ -77,13 +76,7 @@ pub fn analyze_elf(repo_root: &Path, elf_root: &Path) -> ElfAnalysis {
             panic_roots.push(PanicRootInfo::new(demangled.clone()));
         }
 
-        // if is_panic_root {
-        //     // We don't care about the internals of panic root functions, other than their size.
-        //     panic_roots.push(PanicRootInfo::new(demangled.clone(), func_bytes));
-        // } else {
-        for (i, instr) in instrs.iter().enumerate() {
-            num_instructions += 1;
-
+        for instr in instrs.iter() {
             if let Some(panic_callee) = is_panic_call(&instr.text) {
                 let call_site = PanicCallSiteInfo {
                     caller: demangled.clone(),
@@ -101,7 +94,6 @@ pub fn analyze_elf(repo_root: &Path, elf_root: &Path) -> ElfAnalysis {
             is_panic_root,
             panic_calls: local_panic_call_sites,
         });
-        // }
     }
 
     // Now, aggregate the results
@@ -147,14 +139,12 @@ fn extract_functions(asm: &str) -> Vec<(String, Vec<Instr>)> {
         }
 
         // Instruction line
-        if let Some(caps) = asm_line.captures(line) {
-            if current_name.is_some() {
-                let addr = u64::from_str_radix(&caps[1], 16).expect("invalid instruction address");
+        if let Some(caps) = asm_line.captures(line)
+            && current_name.is_some()
+        {
+            let text = caps[3].trim().to_string();
 
-                let text = caps[3].trim().to_string();
-
-                current_instrs.push(Instr { addr, text });
-            }
+            current_instrs.push(Instr { text });
         }
     }
 
@@ -190,13 +180,13 @@ fn is_panic_call(line: &str) -> Option<String> {
 
     // Try to extract the callee symbol, if present
     // This depends on your objdump format; adjust as needed
-    if let Some(start) = line.find('<') {
-        if let Some(end) = line[start + 1..].find('>') {
-            let sym = &line[start + 1..start + 1 + end];
+    if let Some(start) = line.find('<')
+        && let Some(end) = line[start + 1..].find('>')
+    {
+        let sym = &line[start + 1..start + 1 + end];
 
-            if is_known_panic_symbol(sym) {
-                return Some(sym.to_string());
-            }
+        if is_known_panic_symbol(sym) {
+            return Some(sym.to_string());
         }
     }
 
