@@ -88,10 +88,7 @@ fn main() {
     let baseline_summary = analyze_elf(&repo_root, baseline_path);
     let fixed_summary = analyze_elf(&repo_root, fixed_path);
 
-    let datetime_id = chrono::Utc::now().format("%Y%m%d-%H%M%S");
-    let final_folder = project_dir
-        .with_file_name("eval-runs")
-        .join(datetime_id.to_string());
+    let final_folder = project_dir.with_file_name("eval-runs").join("latest");
     fs::create_dir_all(&final_folder).expect("failed to create eval-runs folder");
 
     let final_baseline = final_folder.join("baseline");
