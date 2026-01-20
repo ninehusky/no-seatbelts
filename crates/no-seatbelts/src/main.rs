@@ -84,6 +84,7 @@ fn main() {
                 Box::new(no_seatbelts::DivByZeroDetector),
                 Box::new(no_seatbelts::ExplicitPanicDetector),
                 Box::new(no_seatbelts::ArrayAccessDetector::new()),
+                Box::new(no_seatbelts::SliceDetector::new()),
             ]);
 
             for free_id in tcx.hir_crate_items(()).free_items() {
