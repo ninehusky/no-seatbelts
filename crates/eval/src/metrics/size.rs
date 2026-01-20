@@ -2,7 +2,10 @@ use std::{collections::BTreeMap, path::Path};
 
 use serde::Serialize;
 
-use crate::project::find_elf;
+use crate::{
+    docker::{run_in_docker, to_container_path},
+    project::find_elf,
+};
 
 #[derive(Clone, Debug, Serialize)]
 pub struct SizeReport {
@@ -22,7 +25,7 @@ pub struct FunctionSizes {
     pub size_bytes: u64,
 }
 
-pub fn get_size_report(crate_root: &Path) -> SizeReport {
+pub fn get_size_report(repo_root: &Path, crate_root: &Path) -> SizeReport {
     let elf_path = find_elf(crate_root);
     let binary_name = elf_path
         .file_name()
@@ -30,8 +33,8 @@ pub fn get_size_report(crate_root: &Path) -> SizeReport {
         .unwrap_or("unknown")
         .to_string();
 
-    let section_sizes = get_section_sizes(crate_root);
-    let function_sizes = get_function_sizes(crate_root);
+    let section_sizes = get_section_sizes(repo_root, crate_root);
+    let function_sizes = get_function_sizes(repo_root, crate_root);
 
     SizeReport {
         binary: binary_name,
@@ -40,17 +43,19 @@ pub fn get_size_report(crate_root: &Path) -> SizeReport {
     }
 }
 
-fn get_function_sizes(crate_root: &Path) -> Vec<FunctionSizes> {
+fn get_function_sizes(repo_root: &Path, crate_root: &Path) -> Vec<FunctionSizes> {
     let elf_path = find_elf(crate_root);
 
-    // nm --print-size --size-sort --radix=d tst.o
-    let output = std::process::Command::new("llvm-nm")
-        .arg("--print-size")
-        .arg("--size-sort")
-        .arg("--radix=d")
-        .arg(&elf_path)
-        .output()
-        .expect("failed to run llvm-nm");
+    let output = run_in_docker(
+        repo_root,
+        &[
+            "llvm-nm",
+            "--print-size",
+            "--size-sort",
+            "--radix=d",
+            to_container_path(repo_root, &elf_path).as_str(),
+        ],
+    );
 
     assert!(
         output.status.success(),
@@ -84,14 +89,23 @@ fn get_function_sizes(crate_root: &Path) -> Vec<FunctionSizes> {
         .collect()
 }
 
-fn get_section_sizes(crate_root: &Path) -> SectionSizes {
+fn get_section_sizes(repo_root: &Path, crate_root: &Path) -> SectionSizes {
     let elf_path = find_elf(crate_root);
 
-    let output = std::process::Command::new("llvm-readelf")
-        .arg("-S")
-        .arg(&elf_path)
-        .output()
-        .expect("failed to run llvm-readelf");
+    let output = run_in_docker(
+        repo_root,
+        &[
+            "llvm-readelf",
+            "-S",
+            to_container_path(repo_root, &elf_path).as_str(),
+        ],
+    );
+
+    // let output = std::process::Command::new("llvm-readelf")
+    //     .arg("-S")
+    //     .arg(&elf_path)
+    //     .output()
+    //     .expect("failed to run llvm-readelf");
 
     assert!(
         output.status.success(),
@@ -101,9 +115,6 @@ fn get_section_sizes(crate_root: &Path) -> SectionSizes {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut sections = BTreeMap::new();
-
-    println!("readelf stdout:");
-    println!("{}", stdout);
 
     for line in stdout.lines() {
         let line = line.trim();

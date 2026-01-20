@@ -70,7 +70,6 @@ pub fn find_elf(project_dir: &Path) -> std::path::PathBuf {
         if entry.path().extension().is_some() {
             continue;
         }
-        println!("found ELF at {}", entry.path().display());
         return entry.path();
     }
     panic!(

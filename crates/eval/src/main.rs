@@ -127,8 +127,8 @@ fn main() {
         "ring-buffer-smoketest",
         &baseline_summary,
         &fixed_summary,
-        metrics::size::get_size_report(baseline_path),
-        metrics::size::get_size_report(fixed_path),
+        metrics::size::get_size_report(&repo_root, baseline_path),
+        metrics::size::get_size_report(&repo_root, fixed_path),
     )
     .expect("failed to write panic report");
 }
