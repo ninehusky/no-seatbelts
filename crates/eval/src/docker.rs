@@ -34,6 +34,13 @@ pub fn docker_compile(repo_root: &Path, project_dir: &Path) -> Result<(), ()> {
     Ok(())
 }
 
+pub fn to_container_path(repo_root: &Path, host_path: &Path) -> String {
+    let rel = host_path
+        .strip_prefix(repo_root)
+        .expect("path not under repo root");
+    format!("/work/{}", rel.display())
+}
+
 pub fn run_in_docker(repo_root: &Path, args: &[&str]) -> Output {
     let output = Command::new("docker")
         .args([

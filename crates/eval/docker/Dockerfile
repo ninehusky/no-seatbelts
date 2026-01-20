@@ -6,6 +6,7 @@ FROM ubuntu:latest
 # Importantly, this installs gcc for cross-compilation to ARM and x86.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    llvm \
     curl build-essential pkg-config libssl-dev python3 python3-pip \
     git ca-certificates llvm file openssh-client git-lfs \
     gcc-i686-linux-gnu \
@@ -44,10 +45,6 @@ RUN rustup target add i686-unknown-linux-gnu \
 
 # Install rustfilt for Rust symbol demangling
 RUN cargo install rustfilt
-
-# prob don't need ts anymore.
-# RUN pip3 install --break-system-packages -r python/requirements.txt
-
 
 # Set the default command
 CMD ["bash"]

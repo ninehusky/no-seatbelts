@@ -6,7 +6,6 @@ use clap::Parser;
 
 use crate::docker::{docker_compile, ensure_docker_image};
 use crate::metrics::binary::analyze_elf;
-use crate::metrics::size::get_size;
 use crate::noseatbelts::{apply_suggestions, run_no_seatbelts};
 use crate::{cli::EvalArgs, project::copy_dir_recursive};
 
@@ -18,6 +17,16 @@ mod project;
 
 #[allow(dead_code)]
 const TARGET: &str = "i686-unknown-linux-gnu";
+
+// This is for Github Actions compatibility for filenames.
+fn sanitize_for_path(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            '<' | '>' | ':' | '"' | '|' | '*' | '?' | '\n' | '\r' => '_',
+            _ => c,
+        })
+        .collect()
+}
 
 fn main() {
     let repo_root = std::env::current_dir().expect("failed to get current dir");
@@ -74,9 +83,6 @@ fn main() {
     docker_compile(&repo_root, fixed_path).unwrap();
 
     // 6. Measure ELF sizes (host-side)
-    println!("exists? {}", baseline_path.exists());
-    let baseline_size = get_size(baseline_path);
-    let fixed_size = get_size(fixed_path);
 
     // 7. Save fixed project
     let fixed_out = project_dir.with_file_name(format!(
@@ -87,18 +93,52 @@ fn main() {
 
     // 8. Report + exit
     println!("Fixed project saved to {}", fixed_out.display());
-    println!("Original size: {} bytes", baseline_size);
-    println!("New size: {} bytes", fixed_size);
-    println!(
-        "This shrunk the binary by {} bytes",
-        baseline_size as i64 - fixed_size as i64
-    );
-
-    if fixed_size >= baseline_size {
-        std::process::exit(1);
-    }
 
     // 9. Analyze ELF binaries.
-    println!("exists? {}", baseline_path.exists());
-    analyze_elf(&repo_root, baseline_path);
+    let baseline_summary = analyze_elf(&repo_root, baseline_path);
+    let fixed_summary = analyze_elf(&repo_root, fixed_path);
+
+    let final_folder = project_dir.with_file_name("eval-runs").join("latest");
+    fs::create_dir_all(&final_folder).expect("failed to create eval-runs folder");
+
+    let final_baseline = final_folder.join("baseline");
+    copy_dir_recursive(baseline_path, &final_baseline).expect("failed to save baseline project");
+
+    let final_fixed = final_folder.join("fixed");
+    copy_dir_recursive(fixed_path, &final_fixed).expect("failed to save fixed project");
+
+    // 10. Build the report.
+    let report_path = final_folder.join("panic-report.json");
+    let asm_path = final_folder.join("asm-dumps");
+    fs::create_dir_all(&asm_path).expect("failed to create asm-dumps folder");
+
+    for fn_name in baseline_summary.functions.keys() {
+        let sanitized_fn_name = sanitize_for_path(fn_name);
+        let fn_path = asm_path.join(&sanitized_fn_name);
+        fs::create_dir_all(&fn_path).expect("failed to create function asm folder");
+        let baseline_asm_path = fn_path.join(format!("baseline-{}.asm", sanitized_fn_name));
+        let fixed_asm_path = fn_path.join(format!("fixed-{}.asm", sanitized_fn_name));
+
+        if let Some(fn_asm) = baseline_summary.functions.get(fn_name) {
+            fs::write(&baseline_asm_path, &fn_asm.body)
+                .expect("failed to write baseline function asm");
+        }
+
+        if let Some(fn_asm) = fixed_summary.functions.get(fn_name) {
+            fs::write(&fixed_asm_path, &fn_asm.body).expect("failed to write fixed function asm");
+        } else {
+            fs::write(&fixed_asm_path, "// Function removed in fixed build")
+                .expect("failed to write fixed function asm");
+        }
+    }
+
+    metrics::report::write_panic_report(
+        &report_path,
+        "ring-buffer-smoketest",
+        &baseline_summary,
+        &fixed_summary,
+        metrics::size::get_size_report(&repo_root, baseline_path),
+        metrics::size::get_size_report(&repo_root, fixed_path),
+    )
+    .expect("failed to write panic report");
 }
