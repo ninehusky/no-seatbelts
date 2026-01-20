@@ -45,7 +45,7 @@ impl PanicDetector for CheckedFunctionDetector {
         body: &rustc_middle::mir::Body<'tcx>,
         terminator: &rustc_middle::mir::Terminator<'tcx>,
     ) -> Option<NoSeatbeltsDiag> {
-        let TerminatorKind::Call { func, .. } = &terminator.kind else {
+        let TerminatorKind::Call { func, args, .. } = &terminator.kind else {
             return None;
         };
 
@@ -53,7 +53,12 @@ impl PanicDetector for CheckedFunctionDetector {
 
         let (_recv_span, recv_str) = extract_receiver_snippet(tcx, body, terminator)?;
         let call_span = terminator.source_info.span.source_callsite();
-        let suggestion = get_replacement(tcx, def_id, Some(recv_str))?;
+        let args_as_strs = args
+            .iter()
+            .map(|arg| tcx.sess.source_map().span_to_snippet(arg.span).ok())
+            .collect();
+
+        let suggestion = get_replacement(tcx, def_id, Some(recv_str), args_as_strs)?;
 
         Some(NoSeatbeltsDiag {
             span: call_span,

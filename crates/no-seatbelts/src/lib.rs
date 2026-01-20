@@ -35,22 +35,11 @@ impl<'tcx> PanicPass {
         Self { detectors }
     }
 
-    pub fn check_body(&self, tcx: &rustc_middle::ty::TyCtxt<'tcx>, body: &Body<'tcx>) {
+    pub fn check_body(&self, tcx: &rustc_middle::ty::TyCtxt<'tcx>, body: &'tcx Body<'tcx>) {
         if !tcx.is_mir_available(body.source.def_id()) {
             return;
         }
         for bb in tcx.optimized_mir(body.source.def_id()).basic_blocks.iter() {
-            for statement in &bb.statements {
-                for detector in &self.detectors {
-                    if let Some(diag) = detector.detect_statement(*tcx, body, statement) {
-                        let hir_id =
-                            tcx.local_def_id_to_hir_id(body.source.def_id().expect_local());
-                        let span = statement.source_info.span;
-
-                        tcx.emit_node_span_lint(PANIC_PASS, hir_id, span, diag);
-                    }
-                }
-            }
             let terminator = &bb.terminator;
             if terminator.is_none() {
                 continue;
@@ -62,6 +51,18 @@ impl<'tcx> PanicPass {
                     let hir_id = tcx.local_def_id_to_hir_id(body.source.def_id().expect_local());
 
                     tcx.emit_node_span_lint(PANIC_PASS, hir_id, diag.span, diag);
+                }
+            }
+
+            for statement in &bb.statements {
+                for detector in &self.detectors {
+                    if let Some(diag) = detector.detect_statement(*tcx, body, statement) {
+                        let hir_id =
+                            tcx.local_def_id_to_hir_id(body.source.def_id().expect_local());
+                        let span = statement.source_info.span;
+
+                        tcx.emit_node_span_lint(PANIC_PASS, hir_id, span, diag);
+                    }
                 }
             }
         }

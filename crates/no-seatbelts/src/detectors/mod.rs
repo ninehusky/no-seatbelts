@@ -5,19 +5,23 @@ use rustc_middle::{
 
 use crate::diagnostics::NoSeatbeltsDiag;
 
+mod array_access;
 mod checked_functions;
 mod div_by_zero;
 mod explicit_panics;
+mod slice_access;
 
+pub use array_access::ArrayAccessDetector;
 pub use checked_functions::CheckedFunctionDetector;
 pub use div_by_zero::DivByZeroDetector;
 pub use explicit_panics::ExplicitPanicDetector;
+pub use slice_access::SliceDetector;
 
 pub trait PanicDetector {
     fn detect_terminator<'tcx>(
         &self,
         tcx: TyCtxt<'tcx>,
-        body: &Body<'tcx>,
+        body: &'tcx Body<'tcx>,
         terminator: &Terminator<'tcx>,
     ) -> Option<NoSeatbeltsDiag>;
 
