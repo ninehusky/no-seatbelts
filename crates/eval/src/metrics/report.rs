@@ -18,7 +18,7 @@ pub struct PanicReport {
 #[derive(Serialize)]
 pub struct FunctionPanicStats {
     pub size_bytes: usize,
-    pub panic_calls: usize,
+    pub panic_calls: Vec<PanicCallSiteInfo>,
 }
 
 #[derive(Serialize)]
@@ -31,8 +31,8 @@ pub struct FunctionPanicDiff {
 #[derive(Serialize)]
 pub struct GlobalPanicDiff {
     pub size_delta: isize,
-    pub removed_panic_calls: usize,
-    pub removed_panic_functions: usize,
+    pub removed_panic_calls: Vec<PanicCallSiteInfo>,
+    pub removed_panic_functions: Vec<PanicRootInfo>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -86,7 +86,7 @@ impl PanicRootInfo {
         Self { name, size_bytes }
     }
 }
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 pub struct PanicCallSiteInfo {
     /// Name of the function containing the call
     pub caller: String,
@@ -114,7 +114,13 @@ pub fn write_panic_report(
         serde_json::to_string_pretty(&report).expect("failed to serialize panic report to JSON");
     std::fs::write(out_path, json).expect("failed to write panic report to file");
 
+    println!("Saved panic report to {}", out_path.display());
+
     Ok(())
+}
+
+fn call_key(cs: &PanicCallSiteInfo) -> (&str, &str) {
+    (&cs.caller, &cs.callee)
 }
 
 fn build_panic_report(
@@ -124,11 +130,47 @@ fn build_panic_report(
     baseline_size: usize,
     fixed_size: usize,
 ) -> PanicReport {
+    let fixed_call_keys = fixed
+        .functions
+        .values()
+        .flat_map(|f| f.panic_calls.iter())
+        .map(call_key)
+        .collect::<std::collections::HashSet<(&str, &str)>>();
+
+    let baseline_call_keys = baseline
+        .functions
+        .values()
+        .flat_map(|f| f.panic_calls.iter())
+        .map(call_key)
+        .collect::<std::collections::HashSet<(&str, &str)>>();
+
+    let removed_panic_call_sites: Vec<PanicCallSiteInfo> = baseline_call_keys
+        .iter()
+        .filter(|key| !fixed_call_keys.contains(key))
+        .map(|(caller, callee)| {
+            // find the actual PanicCallSiteInfo from baseline
+            let pcs = baseline
+                .functions
+                .values()
+                .flat_map(|f| f.panic_calls.iter())
+                .find(|pc| pc.caller == **caller && pc.callee == **callee)
+                .expect("failed to find removed panic call site info");
+            pcs.clone()
+        })
+        .collect();
+
+    let removed_panic_functions: Vec<PanicRootInfo> = baseline
+        .functions
+        .values()
+        .filter(|f| f.is_panic_root)
+        .filter(|f| !fixed.functions.contains_key(&f.name))
+        .map(|f| PanicRootInfo::new(f.name.clone(), f.total_bytes))
+        .collect();
+
     let diff = GlobalPanicDiff {
         size_delta: fixed_size as isize - baseline_size as isize,
-        removed_panic_calls: count_panics(baseline) - count_panics(fixed),
-        removed_panic_functions: baseline.summary.num_panic_functions
-            - fixed.summary.num_panic_functions,
+        removed_panic_calls: removed_panic_call_sites,
+        removed_panic_functions: removed_panic_functions,
     };
 
     PanicReport {
@@ -141,7 +183,11 @@ fn build_panic_report(
 }
 
 fn count_panics(analysis: &ElfAnalysis) -> usize {
-    analysis.functions.values().map(|f| f.num_panic_calls).sum()
+    analysis
+        .functions
+        .values()
+        .map(|f| f.panic_calls.len())
+        .sum()
 }
 
 fn compute_function_diffs(baseline: &ElfAnalysis, fixed: &ElfAnalysis) -> Vec<FunctionPanicDiff> {
@@ -153,11 +199,25 @@ fn compute_function_diffs(baseline: &ElfAnalysis, fixed: &ElfAnalysis) -> Vec<Fu
                 name: fn_name.clone(),
                 baseline: FunctionPanicStats {
                     size_bytes: base_fn.total_bytes,
-                    panic_calls: base_fn.num_panic_calls,
+                    panic_calls: base_fn.panic_calls.clone(),
                 },
                 fixed: FunctionPanicStats {
                     size_bytes: fixed_fn.total_bytes,
-                    panic_calls: fixed_fn.num_panic_calls,
+                    panic_calls: fixed_fn.panic_calls.clone(),
+                },
+            };
+            diffs.push(func_diff);
+        } else {
+            // function removed in fixed binary
+            let func_diff = FunctionPanicDiff {
+                name: fn_name.clone(),
+                baseline: FunctionPanicStats {
+                    size_bytes: base_fn.total_bytes,
+                    panic_calls: base_fn.panic_calls.clone(),
+                },
+                fixed: FunctionPanicStats {
+                    size_bytes: 0,
+                    panic_calls: Vec::new(),
                 },
             };
             diffs.push(func_diff);

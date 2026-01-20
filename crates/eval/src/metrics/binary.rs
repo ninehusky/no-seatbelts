@@ -49,8 +49,8 @@ pub struct FunctionAsm {
     /// Whether this function is a known panic root.
     pub is_panic_root: bool,
 
-    /// Number of call instructions to panic roots.
-    pub num_panic_calls: usize,
+    /// The actual panic calls.
+    pub panic_calls: Vec<PanicCallSiteInfo>,
 
     /// Total size of call instructions to panic roots.
     pub panic_call_bytes: usize,
@@ -79,7 +79,6 @@ pub fn analyze_elf(repo_root: &Path, elf_root: &Path) -> ElfAnalysis {
         let demangled = demangle(&fn_name).to_string();
         let mut total_bytes = 0usize;
         let mut num_instructions = 0usize;
-        let mut num_panic_calls = 0usize;
         let mut panic_call_bytes = 0usize;
 
         let func_bytes: usize = instrs
@@ -91,42 +90,46 @@ pub fn analyze_elf(repo_root: &Path, elf_root: &Path) -> ElfAnalysis {
         let is_panic_root = is_panic_root(&demangled);
 
         if is_panic_root {
-            // We don't care about the internals of panic root functions, other than their size.
+            println!("PANIC ROOT: function={}, size={}", demangled, func_bytes);
             panic_roots.push(PanicRootInfo::new(demangled.clone(), func_bytes));
-        } else {
-            for (i, instr) in instrs.iter().enumerate() {
-                let instr_size = instruction_size(&instrs, i);
-
-                total_bytes += instr_size;
-                num_instructions += 1;
-
-                if let Some(panic_callee) = is_panic_call(&instr.text) {
-                    println!(
-                        "PANIC CALL: caller={}, size={}, text={}",
-                        demangled, instr_size, instr.text
-                    );
-                    num_panic_calls += 1;
-                    panic_call_bytes += instr_size;
-
-                    panic_call_sites.push(PanicCallSiteInfo {
-                        caller: demangled.clone(),
-                        callee: panic_callee,
-                        call_size_bytes: instr_size,
-                    });
-                }
-            }
-
-            function_asms.push(FunctionAsm {
-                name: demangled,
-                body,
-                crate_name: None,
-                total_bytes,
-                num_instructions,
-                is_panic_root,
-                num_panic_calls,
-                panic_call_bytes,
-            });
         }
+
+        // if is_panic_root {
+        //     // We don't care about the internals of panic root functions, other than their size.
+        //     panic_roots.push(PanicRootInfo::new(demangled.clone(), func_bytes));
+        // } else {
+        for (i, instr) in instrs.iter().enumerate() {
+            let instr_size = instruction_size(&instrs, i);
+
+            total_bytes += instr_size;
+            num_instructions += 1;
+
+            if let Some(panic_callee) = is_panic_call(&instr.text) {
+                println!(
+                    "PANIC CALL: caller={}, size={}, text={}",
+                    demangled, instr_size, instr.text
+                );
+                panic_call_bytes += instr_size;
+
+                panic_call_sites.push(PanicCallSiteInfo {
+                    caller: demangled.clone(),
+                    callee: panic_callee,
+                    call_size_bytes: instr_size,
+                });
+            }
+        }
+
+        function_asms.push(FunctionAsm {
+            name: demangled,
+            body,
+            crate_name: None,
+            total_bytes,
+            num_instructions,
+            is_panic_root,
+            panic_calls: panic_call_sites.clone(),
+            panic_call_bytes,
+        });
+        // }
     }
 
     // Now, aggregate the results
