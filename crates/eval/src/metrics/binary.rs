@@ -123,7 +123,11 @@ pub fn analyze_elf(repo_root: &Path, elf_root: &Path) -> ElfAnalysis {
             name: demangled,
             body,
             crate_name: None,
-            total_bytes,
+            total_bytes: if instrs.is_empty() {
+                0
+            } else {
+                instrs.last().unwrap().addr as usize - instrs.first().unwrap().addr as usize
+            },
             num_instructions,
             is_panic_root,
             panic_calls: panic_call_sites.clone(),

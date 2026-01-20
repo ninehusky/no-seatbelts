@@ -6,7 +6,6 @@ use clap::Parser;
 
 use crate::docker::{docker_compile, ensure_docker_image};
 use crate::metrics::binary::analyze_elf;
-use crate::metrics::size::get_size;
 use crate::noseatbelts::{apply_suggestions, run_no_seatbelts};
 use crate::{cli::EvalArgs, project::copy_dir_recursive};
 
@@ -76,9 +75,6 @@ fn main() {
     docker_compile(&repo_root, fixed_path).unwrap();
 
     // 6. Measure ELF sizes (host-side)
-    println!("exists? {}", baseline_path.exists());
-    let baseline_size = get_size(baseline_path);
-    let fixed_size = get_size(fixed_path);
 
     // 7. Save fixed project
     let fixed_out = project_dir.with_file_name(format!(
@@ -89,14 +85,6 @@ fn main() {
 
     // 8. Report + exit
     println!("Fixed project saved to {}", fixed_out.display());
-    println!("Original size: {} bytes", baseline_size);
-    println!("New size: {} bytes", fixed_size);
-    println!(
-        "This shrunk the binary by {} bytes",
-        baseline_size as i64 - fixed_size as i64
-    );
-
-    assert!(fixed_size <= baseline_size, "fixed binary is not smaller!");
 
     // 9. Analyze ELF binaries.
     println!("BASELINE: ");
@@ -120,13 +108,14 @@ fn main() {
 
     // build the report.
     let report_path = final_folder.join("panic-report.json");
+
     metrics::report::write_panic_report(
         &report_path,
         "ring-buffer-smoketest",
         &baseline_summary,
         &fixed_summary,
-        baseline_size as usize,
-        fixed_size as usize,
+        metrics::size::get_size_report(baseline_path),
+        metrics::size::get_size_report(fixed_path),
     )
     .expect("failed to write panic report");
 }

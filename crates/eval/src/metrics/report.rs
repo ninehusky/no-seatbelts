@@ -4,7 +4,10 @@ use std::{fmt::Display, path::Path};
 
 use serde::Serialize;
 
-use crate::metrics::binary::ElfAnalysis;
+use crate::metrics::{
+    binary::ElfAnalysis,
+    size::{SectionSizes, SizeReport},
+};
 
 #[derive(Serialize)]
 pub struct PanicReport {
@@ -13,6 +16,29 @@ pub struct PanicReport {
     pub fixed: BinaryPanicStats,
     pub diff: GlobalPanicDiff,
     pub functions: Vec<FunctionPanicDiff>,
+    pub size_diff: SizeDiff,
+}
+
+#[derive(Serialize)]
+pub struct SizeDiff {
+    pub section_size_deltas: Vec<SectionSizeDelta>,
+    pub function_size_deltas: Vec<FunctionSizeDelta>,
+}
+
+#[derive(Serialize)]
+pub struct SectionSizeDelta {
+    pub name: String,
+    pub diff: isize,
+    pub baseline_size: u64,
+    pub fixed_size: u64,
+}
+
+#[derive(Serialize)]
+pub struct FunctionSizeDelta {
+    pub name: String,
+    pub diff: isize,
+    pub baseline_size: u64,
+    pub fixed_size: u64,
 }
 
 #[derive(Serialize)]
@@ -105,8 +131,8 @@ pub fn write_panic_report(
     binary_name: &str,
     baseline: &ElfAnalysis,
     fixed: &ElfAnalysis,
-    baseline_size: usize,
-    fixed_size: usize,
+    baseline_size: SizeReport,
+    fixed_size: SizeReport,
 ) -> Result<(), ()> {
     let report = build_panic_report(binary_name, baseline, fixed, baseline_size, fixed_size);
 
@@ -127,8 +153,8 @@ fn build_panic_report(
     binary_name: &str,
     baseline: &ElfAnalysis,
     fixed: &ElfAnalysis,
-    baseline_size: usize,
-    fixed_size: usize,
+    baseline_size: SizeReport,
+    fixed_size: SizeReport,
 ) -> PanicReport {
     let fixed_call_keys = fixed
         .functions
@@ -168,9 +194,49 @@ fn build_panic_report(
         .collect();
 
     let diff = GlobalPanicDiff {
-        size_delta: fixed_size as isize - baseline_size as isize,
+        size_delta: baseline.summary.total_bytes as isize - fixed.summary.total_bytes as isize,
         removed_panic_calls: removed_panic_call_sites,
         removed_panic_functions: removed_panic_functions,
+    };
+
+    let size_diff = SizeDiff {
+        section_size_deltas: baseline_size
+            .section_sizes
+            .sections
+            .iter()
+            .map(|(name, base_size)| {
+                let fixed_size = fixed_size
+                    .section_sizes
+                    .sections
+                    .get(name)
+                    .cloned()
+                    .unwrap_or(0);
+                SectionSizeDelta {
+                    name: name.clone(),
+                    diff: fixed_size as isize - *base_size as isize,
+                    baseline_size: *base_size,
+                    fixed_size,
+                }
+            })
+            .collect(),
+        function_size_deltas: baseline_size
+            .function_sizes
+            .iter()
+            .map(|base_fn| {
+                let fixed_size = fixed_size
+                    .function_sizes
+                    .iter()
+                    .find(|f| f.name == base_fn.name)
+                    .map(|f| f.size_bytes)
+                    .unwrap_or(0);
+                FunctionSizeDelta {
+                    name: base_fn.name.clone(),
+                    diff: fixed_size as isize - base_fn.size_bytes as isize,
+                    baseline_size: base_fn.size_bytes,
+                    fixed_size,
+                }
+            })
+            .collect(),
     };
 
     PanicReport {
@@ -178,16 +244,9 @@ fn build_panic_report(
         baseline: baseline.summary.clone(),
         fixed: fixed.summary.clone(),
         diff,
+        size_diff,
         functions: compute_function_diffs(baseline, fixed),
     }
-}
-
-fn count_panics(analysis: &ElfAnalysis) -> usize {
-    analysis
-        .functions
-        .values()
-        .map(|f| f.panic_calls.len())
-        .sum()
 }
 
 fn compute_function_diffs(baseline: &ElfAnalysis, fixed: &ElfAnalysis) -> Vec<FunctionPanicDiff> {
