@@ -40,20 +40,11 @@ pub struct FunctionAsm {
     /// Optional crate attribution.
     pub crate_name: Option<String>,
 
-    /// Total size of the function in bytes.
-    pub total_bytes: usize,
-
-    /// Number of assembly instructions.
-    pub num_instructions: usize,
-
     /// Whether this function is a known panic root.
     pub is_panic_root: bool,
 
     /// The actual panic calls.
     pub panic_calls: Vec<PanicCallSiteInfo>,
-
-    /// Total size of call instructions to panic roots.
-    pub panic_call_bytes: usize,
 }
 
 pub fn analyze_elf(repo_root: &Path, elf_root: &Path) -> ElfAnalysis {
@@ -71,27 +62,19 @@ pub fn analyze_elf(repo_root: &Path, elf_root: &Path) -> ElfAnalysis {
     let mut panic_call_sites = Vec::new();
     let mut function_asms: Vec<FunctionAsm> = Vec::new();
     for (fn_name, instrs) in fns {
+        let mut local_panic_call_sites = Vec::new();
         let body = instrs
             .iter()
             .map(|x| x.text.clone())
             .collect::<Vec<String>>()
             .join("\n");
         let demangled = demangle(&fn_name).to_string();
-        let mut total_bytes = 0usize;
         let mut num_instructions = 0usize;
-        let mut panic_call_bytes = 0usize;
-
-        let func_bytes: usize = instrs
-            .iter()
-            .enumerate()
-            .map(|(i, _)| instruction_size(&instrs, i))
-            .sum();
 
         let is_panic_root = is_panic_root(&demangled);
 
         if is_panic_root {
-            println!("PANIC ROOT: function={}, size={}", demangled, func_bytes);
-            panic_roots.push(PanicRootInfo::new(demangled.clone(), func_bytes));
+            panic_roots.push(PanicRootInfo::new(demangled.clone()));
         }
 
         // if is_panic_root {
@@ -99,23 +82,15 @@ pub fn analyze_elf(repo_root: &Path, elf_root: &Path) -> ElfAnalysis {
         //     panic_roots.push(PanicRootInfo::new(demangled.clone(), func_bytes));
         // } else {
         for (i, instr) in instrs.iter().enumerate() {
-            let instr_size = instruction_size(&instrs, i);
-
-            total_bytes += instr_size;
             num_instructions += 1;
 
             if let Some(panic_callee) = is_panic_call(&instr.text) {
-                println!(
-                    "PANIC CALL: caller={}, size={}, text={}",
-                    demangled, instr_size, instr.text
-                );
-                panic_call_bytes += instr_size;
-
-                panic_call_sites.push(PanicCallSiteInfo {
+                let call_site = PanicCallSiteInfo {
                     caller: demangled.clone(),
                     callee: panic_callee,
-                    call_size_bytes: instr_size,
-                });
+                };
+                local_panic_call_sites.push(call_site.clone());
+                panic_call_sites.push(call_site);
             }
         }
 
@@ -123,29 +98,17 @@ pub fn analyze_elf(repo_root: &Path, elf_root: &Path) -> ElfAnalysis {
             name: demangled,
             body,
             crate_name: None,
-            total_bytes: if instrs.is_empty() {
-                0
-            } else {
-                instrs.last().unwrap().addr as usize - instrs.first().unwrap().addr as usize
-            },
-            num_instructions,
             is_panic_root,
-            panic_calls: panic_call_sites.clone(),
-            panic_call_bytes,
+            panic_calls: local_panic_call_sites,
         });
         // }
     }
 
     // Now, aggregate the results
 
-    // the number of panic functions.
-    let removable_panic_root_bytes: usize = panic_roots.iter().map(|pr| pr.size_bytes).sum();
-
     let summary = BinaryPanicStats {
         num_functions: function_asms.len(),
         num_panic_functions: panic_roots.len(),
-        total_bytes: function_asms.iter().map(|fa| fa.total_bytes).sum(),
-        removable_panic_function_bytes: removable_panic_root_bytes,
         total_panic_calls: panic_call_sites.len(),
     };
 
@@ -222,7 +185,6 @@ fn is_known_panic_symbol(sym: &str) -> bool {
 fn is_panic_call(line: &str) -> Option<String> {
     // Only care about call instructions
     if !(line.contains("call") || line.contains("bl")) {
-        eprintln!("skipping non-call line: {}", line);
         return None;
     }
 
@@ -239,14 +201,4 @@ fn is_panic_call(line: &str) -> Option<String> {
     }
 
     None
-}
-
-fn instruction_size(instrs: &[Instr], i: usize) -> usize {
-    if i + 1 < instrs.len() {
-        (instrs[i + 1].addr - instrs[i].addr) as usize
-    } else {
-        // TODO: fix this.
-        eprintln!("approximating the last instruction size to be 5 bytes");
-        5
-    }
 }

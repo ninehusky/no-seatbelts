@@ -43,7 +43,6 @@ pub struct FunctionSizeDelta {
 
 #[derive(Serialize)]
 pub struct FunctionPanicStats {
-    pub size_bytes: usize,
     pub panic_calls: Vec<PanicCallSiteInfo>,
 }
 
@@ -56,7 +55,6 @@ pub struct FunctionPanicDiff {
 
 #[derive(Serialize)]
 pub struct GlobalPanicDiff {
-    pub size_delta: isize,
     pub removed_panic_calls: Vec<PanicCallSiteInfo>,
     pub removed_panic_functions: Vec<PanicRootInfo>,
 }
@@ -67,11 +65,6 @@ pub struct BinaryPanicStats {
     pub num_functions: usize,
     pub num_panic_functions: usize,
 
-    /// Sizes
-    pub total_bytes: usize,
-
-    /// Upper bound of potential savings
-    pub removable_panic_function_bytes: usize,
     pub total_panic_calls: usize,
 }
 
@@ -81,13 +74,7 @@ impl Display for BinaryPanicStats {
         writeln!(f, "---------------------")?;
         writeln!(f, "Total functions: {}", self.num_functions)?;
         writeln!(f, "Panic functions: {}", self.num_panic_functions)?;
-        writeln!(f, "Total size (bytes): {}", self.total_bytes)?;
         writeln!(f, "Total panic calls: {}", self.total_panic_calls)?;
-        writeln!(
-            f,
-            "Body of panic roots make up this many bytes: {}",
-            self.removable_panic_function_bytes
-        )?;
 
         Ok(())
     }
@@ -99,17 +86,15 @@ impl Display for BinaryPanicStats {
 pub struct PanicRootInfo {
     /// The name of the root function.
     name: String,
-    /// Its size.
-    pub size_bytes: usize,
 }
 
 impl PanicRootInfo {
-    pub fn new(name: String, size_bytes: usize) -> Self {
+    pub fn new(name: String) -> Self {
         assert!(
             name.starts_with("core"),
             "Panic root functions are part of `core`."
         );
-        Self { name, size_bytes }
+        Self { name }
     }
 }
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
@@ -119,9 +104,6 @@ pub struct PanicCallSiteInfo {
 
     /// The panic function being called.
     pub callee: String,
-
-    /// The size of the call instruction.
-    pub call_size_bytes: usize,
 }
 
 /// Write a panic report to a JSON file.
@@ -190,11 +172,10 @@ fn build_panic_report(
         .values()
         .filter(|f| f.is_panic_root)
         .filter(|f| !fixed.functions.contains_key(&f.name))
-        .map(|f| PanicRootInfo::new(f.name.clone(), f.total_bytes))
+        .map(|f| PanicRootInfo::new(f.name.clone()))
         .collect();
 
     let diff = GlobalPanicDiff {
-        size_delta: baseline.summary.total_bytes as isize - fixed.summary.total_bytes as isize,
         removed_panic_calls: removed_panic_call_sites,
         removed_panic_functions: removed_panic_functions,
     };
@@ -257,11 +238,9 @@ fn compute_function_diffs(baseline: &ElfAnalysis, fixed: &ElfAnalysis) -> Vec<Fu
             let func_diff = FunctionPanicDiff {
                 name: fn_name.clone(),
                 baseline: FunctionPanicStats {
-                    size_bytes: base_fn.total_bytes,
                     panic_calls: base_fn.panic_calls.clone(),
                 },
                 fixed: FunctionPanicStats {
-                    size_bytes: fixed_fn.total_bytes,
                     panic_calls: fixed_fn.panic_calls.clone(),
                 },
             };
@@ -271,11 +250,9 @@ fn compute_function_diffs(baseline: &ElfAnalysis, fixed: &ElfAnalysis) -> Vec<Fu
             let func_diff = FunctionPanicDiff {
                 name: fn_name.clone(),
                 baseline: FunctionPanicStats {
-                    size_bytes: base_fn.total_bytes,
                     panic_calls: base_fn.panic_calls.clone(),
                 },
                 fixed: FunctionPanicStats {
-                    size_bytes: 0,
                     panic_calls: Vec::new(),
                 },
             };
