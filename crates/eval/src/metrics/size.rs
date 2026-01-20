@@ -101,12 +101,6 @@ fn get_section_sizes(repo_root: &Path, crate_root: &Path) -> SectionSizes {
         ],
     );
 
-    // let output = std::process::Command::new("llvm-readelf")
-    //     .arg("-S")
-    //     .arg(&elf_path)
-    //     .output()
-    //     .expect("failed to run llvm-readelf");
-
     assert!(
         output.status.success(),
         "llvm-readelf failed with status {:?}",

@@ -18,6 +18,16 @@ mod project;
 #[allow(dead_code)]
 const TARGET: &str = "i686-unknown-linux-gnu";
 
+// This is for Github Actions compatibility for filenames.
+fn sanitize_for_path(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            '<' | '>' | ':' | '"' | '|' | '*' | '?' | '\n' | '\r' => '_',
+            _ => c,
+        })
+        .collect()
+}
+
 fn main() {
     let repo_root = std::env::current_dir().expect("failed to get current dir");
     let args = EvalArgs::parse();
@@ -103,11 +113,11 @@ fn main() {
     fs::create_dir_all(&asm_path).expect("failed to create asm-dumps folder");
 
     for fn_name in baseline_summary.functions.keys() {
-        let fn_file_name = fn_name.replace("<", "_").replace(">", "_");
-        let fn_path = asm_path.join(fn_name.clone());
+        let sanitized_fn_name = sanitize_for_path(fn_name);
+        let fn_path = asm_path.join(&sanitized_fn_name);
         fs::create_dir_all(&fn_path).expect("failed to create function asm folder");
-        let baseline_asm_path = fn_path.join(format!("baseline-{}.asm", fn_file_name));
-        let fixed_asm_path = fn_path.join(format!("fixed-{}.asm", fn_file_name));
+        let baseline_asm_path = fn_path.join(format!("baseline-{}.asm", sanitized_fn_name));
+        let fixed_asm_path = fn_path.join(format!("fixed-{}.asm", sanitized_fn_name));
 
         if let Some(fn_asm) = baseline_summary.functions.get(fn_name) {
             fs::write(&baseline_asm_path, &fn_asm.body)
