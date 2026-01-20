@@ -118,30 +118,15 @@ fn main() {
     let final_fixed = final_folder.join("fixed");
     copy_dir_recursive(fixed_path, &final_fixed).expect("failed to save fixed project");
 
-    let base_fn_info = baseline_summary.functions;
-    let fixed_fn_info = fixed_summary.functions;
-
-    let mut fixed_panics_total = 0;
-    let mut base_panics_total = 0;
-    for (fn_name, base_info) in base_fn_info.iter() {
-        let fixed_info = fixed_fn_info
-            .get(fn_name)
-            .expect("function missing in fixed binary");
-        fixed_panics_total += fixed_info.num_panic_calls;
-        base_panics_total += base_info.num_panic_calls;
-        println!(
-            "Function: {}\n  Panic calls (base): {}\n  Panic calls(fixed): {}\n  Baseline size: {} bytes\n  Fixed size: {} bytes\n  Delta: {} bytes\n",
-            fn_name,
-            base_info.num_panic_calls,
-            fixed_info.num_panic_calls,
-            base_info.total_bytes,
-            fixed_info.total_bytes,
-            base_info.total_bytes as i64 - fixed_info.total_bytes as i64
-        );
-    }
-
-    println!("Total panic calls in baseline: {}", base_panics_total);
-    println!("Total panic calls in fixed: {}", fixed_panics_total);
-
-    println!("saved eval run to {}", final_folder.display());
+    // build the report.
+    let report_path = final_folder.join("panic-report.json");
+    metrics::report::write_panic_report(
+        &report_path,
+        "ring-buffer-smoketest",
+        &baseline_summary,
+        &fixed_summary,
+        baseline_size as usize,
+        fixed_size as usize,
+    )
+    .expect("failed to write panic report");
 }

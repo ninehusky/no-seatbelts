@@ -238,6 +238,8 @@ dependencies = [
  "regex",
  "rustc-demangle",
  "rustfix 0.9.4",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 

@@ -3,12 +3,16 @@ use std::{collections::HashMap, fmt::Display, path::Path};
 
 use rustc_demangle::demangle;
 
-use crate::{docker::run_in_docker, project::find_elf};
+use crate::{
+    docker::run_in_docker,
+    metrics::report::{BinaryPanicStats, PanicCallSiteInfo, PanicRootInfo},
+    project::find_elf,
+};
 
 #[derive(Clone, Debug)]
 pub struct ElfAnalysis {
     pub functions: HashMap<String, FunctionAsm>,
-    pub summary: PanicDebloatSummary,
+    pub summary: BinaryPanicStats,
 }
 
 impl Display for ElfAnalysis {
@@ -20,76 +24,12 @@ impl Display for ElfAnalysis {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct PanicDebloatSummary {
-    /// Counts
-    pub num_functions: usize,
-    pub num_panic_functions: usize,
-
-    /// Sizes
-    pub total_bytes: usize,
-
-    /// Upper bound of potential savings
-    pub removable_panic_function_bytes: usize,
-    pub removable_panic_call_bytes: usize,
+struct Instr {
+    addr: u64,
+    text: String,
 }
 
-impl Display for PanicDebloatSummary {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Panic Debloat Summary")?;
-        writeln!(f, "---------------------")?;
-        writeln!(f, "Total functions: {}", self.num_functions)?;
-        writeln!(f, "Panic functions: {}", self.num_panic_functions)?;
-        writeln!(f, "Total size (bytes): {}", self.total_bytes)?;
-        writeln!(
-            f,
-            "Removable panic function bytes: {}",
-            self.removable_panic_function_bytes
-        )?;
-        writeln!(
-            f,
-            "Removable panic call bytes: {}",
-            self.removable_panic_call_bytes
-        )?;
-
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug)]
-/// A function, brought in by the compiler, whose sole purpose is to
-/// emit a panic.
-pub struct PanicRootInfo {
-    /// The name of the root function.
-    name: String,
-    /// Its size.
-    size_bytes: usize,
-}
-
-impl PanicRootInfo {
-    pub fn new(name: String, size_bytes: usize) -> Self {
-        assert!(
-            name.starts_with("core"),
-            "Panic root functions are part of `core`."
-        );
-        Self { name, size_bytes }
-    }
-}
-#[derive(Clone, Debug)]
-pub struct PanicCallSiteInfo {
-    /// Name of the function containing the call
-    pub caller: String,
-
-    /// The panic function being called.
-    pub callee: String,
-
-    /// The size of the call instruction.
-    pub call_size_bytes: usize,
-}
-
-/// (Optional, internal-use struct)
 /// Per-function assembly facts used to build the report.
-/// This does NOT need to be serialized.
 #[derive(Clone, Debug)]
 pub struct FunctionAsm {
     pub name: String,
@@ -194,16 +134,12 @@ pub fn analyze_elf(repo_root: &Path, elf_root: &Path) -> ElfAnalysis {
     // the number of panic functions.
     let removable_panic_root_bytes: usize = panic_roots.iter().map(|pr| pr.size_bytes).sum();
 
-    // the number of panic call sites.
-    let removable_panic_call_bytes: usize =
-        panic_call_sites.iter().map(|pcs| pcs.call_size_bytes).sum();
-
-    let summary = PanicDebloatSummary {
+    let summary = BinaryPanicStats {
         num_functions: function_asms.len(),
         num_panic_functions: panic_roots.len(),
         total_bytes: function_asms.iter().map(|fa| fa.total_bytes).sum(),
         removable_panic_function_bytes: removable_panic_root_bytes,
-        removable_panic_call_bytes,
+        total_panic_calls: panic_call_sites.len(),
     };
 
     let mut functions_map = HashMap::new();
@@ -296,11 +232,6 @@ fn is_panic_call(line: &str) -> Option<String> {
     }
 
     None
-}
-
-struct Instr {
-    addr: u64,
-    text: String,
 }
 
 fn instruction_size(instrs: &[Instr], i: usize) -> usize {
