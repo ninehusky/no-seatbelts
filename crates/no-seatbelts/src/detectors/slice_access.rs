@@ -1,10 +1,7 @@
 use rustc_hir::{ExprKind, intravisit::Visitor};
 use rustc_middle::{
-    mir::{
-        AggregateKind, AssertKind, BasicBlock, Body, Operand, Place, RawPtrKind, Rvalue, Statement,
-        StatementKind, Terminator, TerminatorKind, UnOp,
-    },
-    ty::{TyCtxt, TyKind},
+    mir::{AggregateKind, Body, Rvalue, Statement, StatementKind, Terminator},
+    ty::TyCtxt,
 };
 use rustc_span::Span;
 use std::{cell::RefCell, collections::HashSet};
@@ -16,6 +13,12 @@ use crate::{
 
 pub struct SliceDetector {
     pub bounds_check_spans: RefCell<HashSet<Span>>,
+}
+
+impl Default for SliceDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SliceDetector {
@@ -37,32 +40,31 @@ impl<'tcx, 'hir> Visitor<'hir> for IndexFinder<'tcx, 'hir> {
     fn visit_expr(&mut self, expr: &'hir rustc_hir::Expr<'hir>) {
         self.parents.push(expr);
 
-        if expr.span.contains(self.needle) {
-            if let ExprKind::Index(base, index, _) = &expr.kind {
-                let sm = self.tcx.sess.source_map();
+        if expr.span.contains(self.needle)
+            && let ExprKind::Index(base, index, _) = &expr.kind
+        {
+            let sm = self.tcx.sess.source_map();
 
-                let Ok(base_snip) = sm.span_to_snippet(base.span) else {
-                    self.parents.pop();
-                    return;
-                };
-                let Ok(index_snip) = sm.span_to_snippet(index.span) else {
-                    self.parents.pop();
-                    return;
-                };
-
-                let replacement =
-                    format!("unsafe {{ {}.get_unchecked({}) }}", base_snip, index_snip);
-
-                // 🔑 choose span: if parent is &expr, replace parent
-                let span = match self.parents.iter().rev().nth(1) {
-                    Some(parent) if matches!(parent.kind, ExprKind::AddrOf(_, _, _)) => parent.span,
-                    _ => expr.span,
-                };
-
-                self.result = Some((span, replacement));
+            let Ok(base_snip) = sm.span_to_snippet(base.span) else {
                 self.parents.pop();
                 return;
-            }
+            };
+            let Ok(index_snip) = sm.span_to_snippet(index.span) else {
+                self.parents.pop();
+                return;
+            };
+
+            let replacement = format!("unsafe {{ {}.get_unchecked({}) }}", base_snip, index_snip);
+
+            // 🔑 choose span: if parent is &expr, replace parent
+            let span = match self.parents.iter().rev().nth(1) {
+                Some(parent) if matches!(parent.kind, ExprKind::AddrOf(_, _, _)) => parent.span,
+                _ => expr.span,
+            };
+
+            self.result = Some((span, replacement));
+            self.parents.pop();
+            return;
         }
 
         rustc_hir::intravisit::walk_expr(self, expr);
@@ -75,9 +77,7 @@ fn find_enclosing_index_expr<'tcx>(
     body: &Body<'tcx>,
     needle: Span,
 ) -> Option<(Span, String)> {
-    let Some(local_id) = body.source.def_id().as_local() else {
-        return None;
-    };
+    let local_id = body.source.def_id().as_local()?;
 
     let hir_body = tcx.hir_body_owned_by(local_id);
     let expr = hir_body.value;
@@ -96,9 +96,9 @@ fn find_enclosing_index_expr<'tcx>(
 impl PanicDetector for SliceDetector {
     fn detect_terminator<'tcx>(
         &self,
-        tcx: TyCtxt<'tcx>,
-        body: &'tcx Body<'tcx>,
-        terminator: &Terminator<'tcx>,
+        _tcx: TyCtxt<'tcx>,
+        _body: &'tcx Body<'tcx>,
+        _terminator: &Terminator<'tcx>,
     ) -> Option<NoSeatbeltsDiag> {
         None
     }
@@ -113,7 +113,7 @@ impl PanicDetector for SliceDetector {
             return None;
         };
 
-        let (place, rvalue) = &**inner;
+        let (_, rvalue) = &**inner;
 
         let Rvalue::Aggregate(agg_kind, _) = rvalue else {
             return None;

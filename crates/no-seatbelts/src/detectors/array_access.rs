@@ -1,8 +1,5 @@
 use rustc_middle::{
-    mir::{
-        AssertKind, BasicBlock, Body, Operand, Place, RawPtrKind, Rvalue, StatementKind,
-        TerminatorKind, UnOp,
-    },
+    mir::{AssertKind, TerminatorKind},
     ty::TyCtxt,
 };
 use rustc_span::Span;
@@ -18,15 +15,19 @@ pub struct ArrayAccessDetector {
     bounds_check_spans: RefCell<HashSet<Span>>,
 
     // spans of statements we already emitted a diagnostic for
-    emitted_stmt_spans: RefCell<HashSet<(u32, u32)>>,
     emitted_bounds_spans: RefCell<HashSet<(u32, u32)>>,
+}
+
+impl Default for ArrayAccessDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ArrayAccessDetector {
     pub fn new() -> Self {
         Self {
             bounds_check_spans: RefCell::new(HashSet::new()),
-            emitted_stmt_spans: RefCell::new(HashSet::new()),
             emitted_bounds_spans: RefCell::new(HashSet::new()),
         }
     }
@@ -112,7 +113,7 @@ fn rewrite_assignment_atomic(stmt: &str) -> Option<String> {
     let stmt = stmt.trim().trim_end_matches(';');
     let (lhs, rhs) = stmt.split_once('=')?;
 
-    let (lhs_ctx, lhs_rest) = strip_index_ctx(lhs);
+    let (_, lhs_rest) = strip_index_ctx(lhs);
     let (rhs_ctx, rhs_rest) = strip_index_ctx(rhs);
 
     let (lhs_base, lhs_idx) = parse_index(lhs_rest.trim())?;
@@ -188,20 +189,20 @@ impl PanicDetector for ArrayAccessDetector {
             if line_snippet.contains('=') && line_snippet.matches('[').count() == 2 {
                 // Only the MIR statement whose snippet equals the line snippet
                 // is allowed to handle the assignment rewrite.
-                if normalize(&snippet) != normalize(&line_snippet) {
+                if normalize(&snippet) != normalize(line_snippet) {
                     return None;
                 }
                 // fall through to assignment special-case
             }
 
             let normalized_snippet = normalize(&snippet);
-            let normalized_line = normalize(&line_snippet);
+            let normalized_line = normalize(line_snippet);
 
             let is_assignment_line = normalized_line.contains('=');
             let lhs_has_index = normalized_line
                 .split('=')
                 .next()
-                .map_or(false, |lhs| lhs.contains('['));
+                .is_some_and(|lhs| lhs.contains('['));
 
             if is_assignment_line && lhs_has_index && normalized_snippet != normalized_line {
                 return None;
