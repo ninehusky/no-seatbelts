@@ -8,6 +8,7 @@ pub fn get_replacement(
     tcx: TyCtxt<'_>,
     def_id: DefId,
     receiver: Option<String>,
+    args: Option<Vec<String>>,
 ) -> Option<Suggestion> {
     if tcx.is_diagnostic_item(sym::option_unwrap, def_id)
         || tcx.is_diagnostic_item(sym::option_expect, def_id)
@@ -24,6 +25,21 @@ pub fn get_replacement(
         return Some(Suggestion::ReplaceCall {
             replacement: "unsafe { std::hint::unreachable_unchecked() }".to_string(),
         });
+    }
+
+    let callee = tcx.opt_item_name(def_id);
+
+    if let Some(symbol) = callee {
+        let fn_name = symbol.as_str();
+        if fn_name == "split_at" {
+            let recv = receiver?;
+            let args = args?[1..].to_vec();
+            let arg_list = args.join(", ");
+
+            return Some(Suggestion::ReplaceCall {
+                replacement: format!("unsafe {{ {}.split_at_unchecked({}) }}", recv, arg_list),
+            });
+        }
     }
 
     None
