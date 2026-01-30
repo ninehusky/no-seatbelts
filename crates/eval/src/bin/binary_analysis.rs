@@ -4,16 +4,10 @@ use std::fs::{self};
 
 use clap::Parser;
 
-use crate::docker::{docker_compile, ensure_docker_image};
-use crate::metrics::binary::analyze_elf;
-use crate::noseatbelts::{apply_suggestions, run_no_seatbelts};
-use crate::{cli::EvalArgs, project::copy_dir_recursive};
-
-mod cli;
-mod docker;
-mod metrics;
-mod noseatbelts;
-mod project;
+use eval::docker::{docker_compile, ensure_docker_image};
+use eval::metrics::binary::analyze_elf;
+use eval::noseatbelts::{apply_suggestions, run_no_seatbelts};
+use eval::{cli::EvalArgs, project::copy_dir_recursive};
 
 #[allow(dead_code)]
 const TARGET: &str = "i686-unknown-linux-gnu";
@@ -64,7 +58,7 @@ fn main() {
         .expect("path not under project root");
 
     // 2. Prepare temp dirs (in host FS)
-    let (baseline_dir, fixed_dir) = project::prepare_temp_projects(&repo_root, project_dir);
+    let (baseline_dir, fixed_dir) = eval::project::prepare_temp_projects(&repo_root, project_dir);
     let baseline_path = baseline_dir.path();
     let fixed_path = fixed_dir.path();
 
@@ -132,13 +126,13 @@ fn main() {
         }
     }
 
-    metrics::report::write_panic_report(
+    eval::metrics::report::write_panic_report(
         &report_path,
         "ring-buffer-smoketest",
         &baseline_summary,
         &fixed_summary,
-        metrics::size::get_size_report(&repo_root, baseline_path),
-        metrics::size::get_size_report(&repo_root, fixed_path),
+        eval::metrics::size::get_size_report(&repo_root, baseline_path),
+        eval::metrics::size::get_size_report(&repo_root, fixed_path),
     )
     .expect("failed to write panic report");
 }
