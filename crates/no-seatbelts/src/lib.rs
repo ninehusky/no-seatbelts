@@ -1,6 +1,7 @@
 #![feature(rustc_private)]
 
 use rustc_driver::Compilation;
+use rustc_hir::def_id::LOCAL_CRATE;
 use rustc_lint::{LateLintPass, LintContext, LintPass};
 use rustc_middle::mir::Body;
 use rustc_session::{declare_lint, declare_lint_pass};
@@ -117,15 +118,9 @@ impl rustc_driver::Callbacks for PanicPass {
     ) -> rustc_driver::Compilation {
         // REAL compilation — run no-seatbelts here
 
-        for free_id in tcx.hir_crate_items(()).free_items() {
-            let item = tcx.hir_item(free_id);
-            if let rustc_hir::ItemKind::Fn { .. } = item.kind {
-                let def_id = item.hir_id().owner.def_id;
-                if tcx.hir_maybe_body_owned_by(def_id).is_some() {
-                    let body = tcx.optimized_mir(def_id.to_def_id());
-                    self.check_body(&tcx, body);
-                }
-            }
+        for def_id in tcx.mir_keys(()) {
+            let body = tcx.optimized_mir(def_id.to_def_id());
+            self.check_body(&tcx, body);
         }
 
         for impl_id in tcx.hir_crate_items(()).impl_items() {
