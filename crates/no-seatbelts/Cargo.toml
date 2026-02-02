@@ -3,6 +3,10 @@ name = "no-seatbelts"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "cargo-no-seatbelts"
+path = "src/main.rs"
+
 [dependencies]
 compiletest_rs = { version = "0.11", features = ["tmp"] }
 clap = { version = "4.3", features = ["derive"] }

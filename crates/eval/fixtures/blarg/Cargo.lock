@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "ring-buffer-smoketest"
+name = "blarg"
 version = "0.1.0"

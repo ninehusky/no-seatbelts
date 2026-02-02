@@ -1,0 +1,7 @@
+error: failed to load manifest for dependency `capsules-core`
+
+Caused by:
+  failed to read `/Users/acheung/research/projects/no-seatbelts/crates/eval/fixtures/tock_harness/~/research/projects/tock/capsules/core/Cargo.toml`
+
+Caused by:
+  No such file or directory (os error 2)

@@ -11,7 +11,7 @@ extern crate rustc_session;
 extern crate rustc_span;
 extern crate rustc_target;
 
-use std::path::PathBuf;
+use std::{path::PathBuf, process::Command};
 
 use clap::Parser;
 use rustc_errors::registry;
@@ -34,7 +34,44 @@ pub struct NoSeatbeltsArgs {
     pub rustc_args: Vec<String>,
 }
 
+fn run_as_rustc_wrapper() {
+    let mut args = std::env::args().collect::<Vec<String>>();
+    if args.len() >= 3 && args[2] == "-vV" {
+        // Forward directly to real rustc
+        let status = std::process::Command::new(&args[1])
+            .args(&args[2..])
+            .status()
+            .expect("failed to run rustc -vV");
+        std::process::exit(status.code().unwrap_or(1));
+    }
+
+    let mut args_iter = std::env::args();
+    args_iter.next();
+    args_iter.next().expect("expected rustc path");
+    let mut rustc_args: Vec<String> = vec![];
+    rustc_args.push("rustc".to_string()); // argv[0] — REQUIRED
+    rustc_args.extend(args_iter);
+
+    let mut lint_pass = PanicPass::new(vec![
+        Box::new(no_seatbelts::CheckedFunctionDetector),
+        Box::new(no_seatbelts::DivByZeroDetector),
+        Box::new(no_seatbelts::ExplicitPanicDetector),
+        Box::new(no_seatbelts::ArrayAccessDetector::new()),
+        Box::new(no_seatbelts::SliceDetector::new()),
+    ]);
+
+    rustc_driver::run_compiler(&rustc_args, &mut lint_pass);
+}
+
 fn main() {
+    eprintln!("no-seatbelts main called");
+    if std::env::var("RUSTC_WRAPPER").is_ok() {
+        run_as_rustc_wrapper();
+        return;
+    }
+}
+
+fn stub() {
     let mut args = NoSeatbeltsArgs::parse();
     let mut opts = config::Options::default();
 
