@@ -6,6 +6,7 @@ use clap::Parser;
 
 use crate::docker::{docker_compile, ensure_docker_image};
 use crate::metrics::binary::analyze_elf;
+use crate::metrics::symbols;
 use crate::noseatbelts::{apply_suggestions, run_no_seatbelts};
 use crate::{cli::EvalArgs, project::copy_dir_recursive};
 
@@ -31,6 +32,10 @@ fn sanitize_for_path(s: &str) -> String {
 fn main() {
     let repo_root = std::env::current_dir().expect("failed to get current dir");
     let args = EvalArgs::parse();
+
+    // Just get the invariant code running for now.
+    symbols::check_elf_invariant(&repo_root, &args.src_path);
+    return;
 
     // 1. Remove previous `fixed` version, if any.
     let crate_dir = args

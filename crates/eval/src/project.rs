@@ -52,18 +52,13 @@ pub fn prepare_temp_projects(repo_root: &Path, project_dir: &Path) -> (TempDir, 
 }
 
 pub fn find_elf(project_dir: &Path) -> std::path::PathBuf {
-    let target_dir = project_dir
-        .join("target")
-        .join("i686-unknown-linux-gnu")
-        .join("release");
+    let target = "thumbv7em-none-eabi";
+    let exec_name = "tock_harness";
+    let target_dir = project_dir.join("target").join(target).join("release");
+    println!("target dir: {}", target_dir.display());
     for entry in fs::read_dir(target_dir).expect("failed to read target/release/deps") {
         let entry = entry.expect("failed to read entry");
-        if !entry
-            .file_name()
-            .to_str()
-            .unwrap()
-            .contains("ring-buffer-smoketest")
-        {
+        if !entry.file_name().to_str().unwrap().contains(exec_name) {
             continue;
         }
         // make sure no file extension

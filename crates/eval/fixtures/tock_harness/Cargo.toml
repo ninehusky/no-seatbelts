@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 capsules-core = { path = "/work/tock/capsules/core" }
 kernel = { path = "/work/tock/kernel" }
+# capsules-core = { path = "~/research/projects/tock/capsules/core" }
+# kernel = { path = "~/research/projects/tock/kernel" }
 
 [workspace]
 

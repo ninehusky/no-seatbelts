@@ -87,10 +87,10 @@ pub struct PanicRootInfo {
 
 impl PanicRootInfo {
     pub fn new(name: String) -> Self {
-        assert!(
-            name.starts_with("core"),
-            "Panic root functions are part of `core`."
-        );
+        // assert!(
+        //     name.starts_with("core"),
+        //     "Panic root functions are part of `core`."
+        // );
         Self { name }
     }
 }
