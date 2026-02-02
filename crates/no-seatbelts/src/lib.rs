@@ -88,6 +88,11 @@ impl<'tcx> LateLintPass<'tcx> for PanicLatePass {
     fn check_body(&mut self, _: &rustc_lint::LateContext<'tcx>, body: &rustc_hir::Body<'tcx>) {}
 }
 
+// Andrew note: here's how you compile it.
+// RUSTFLAGS="-Wpanic-pass" \
+// RUSTC_WRAPPER=./target/debug/cargo-no-seatbelts \
+// cargo build --manifest-path ./crates/eval/fixtures/blarg/Cargo.toml
+
 impl rustc_driver::Callbacks for PanicPass {
     fn config(&mut self, config: &mut rustc_interface::interface::Config) {
         config.register_lints = Some(Box::new(|_sess, lint_store| {
