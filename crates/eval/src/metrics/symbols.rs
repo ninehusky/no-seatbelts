@@ -24,11 +24,11 @@ use crate::metrics::binary::analyze_elf;
 mod tock_shims {
     pub const ALARM_SHIMS: &[&str] = &[
         "KEEP_ALARM_NEW",
-        "KEEP_ALARM_EARLIEST_ALARM",
-        "KEEP_ALARM_PROCESS_REARM_OR_CALLBACK",
-        "KEEP_ALARM_REARM_U32_LEFT_JUSTIFIED_EXPIRATION",
+        // "KEEP_ALARM_EARLIEST_ALARM",
+        // "KEEP_ALARM_PROCESS_REARM_OR_CALLBACK",
+        // "KEEP_ALARM_REARM_U32_LEFT_JUSTIFIED_EXPIRATION",
         "KEEP_ALARM_COMMAND",
-        "KEEP_ALARM_ALLOCATE_GRANT",
+        // "KEEP_ALARM_ALLOCATE_GRANT",
         "KEEP_ALARM_ALARM",
     ];
 
@@ -55,7 +55,8 @@ pub fn check_elf_invariant(repo_root: &Path, elf_path: &Path) -> bool {
         println!("func: {}", demangle(func));
     }
 
-    let all_shims = tock_shims::BUTTON_SHIMS;
+    let all_shims = &[tock_shims::ALARM_SHIMS, tock_shims::BUTTON_SHIMS].concat();
+
     for shim in all_shims {
         if !analysis.functions.keys().any(|f| is_shim(shim, f.as_str())) {
             println!("Missing required shim: {}", shim);
