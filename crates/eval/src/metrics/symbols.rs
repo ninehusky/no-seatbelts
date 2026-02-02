@@ -39,6 +39,14 @@ mod tock_shims {
         "KEEP_BUTTON_ALLOCATE_GRANT",
         "KEEP_BUTTON_FIRED",
     ];
+
+    pub const CONSOLE_SHIMS: &[&str] = &[
+        "KEEP_CONSOLE_NEW",
+        "KEEP_CONSOLE_COMMAND",
+        "KEEP_CONSOLE_ALLOCATE_GRANT",
+        "KEEP_CONSOLE_TRANSMITTED_BUFFER",
+        "KEEP_CONSOLE_RECEIVED_BUFFER",
+    ];
 }
 
 fn is_shim(shim_name: &str, fn_name: &str) -> bool {
@@ -55,7 +63,12 @@ pub fn check_elf_invariant(repo_root: &Path, elf_path: &Path) -> bool {
         println!("func: {}", demangle(func));
     }
 
-    let all_shims = &[tock_shims::ALARM_SHIMS, tock_shims::BUTTON_SHIMS].concat();
+    let all_shims = &[
+        tock_shims::ALARM_SHIMS,
+        tock_shims::BUTTON_SHIMS,
+        tock_shims::CONSOLE_SHIMS,
+    ]
+    .concat();
 
     for shim in all_shims {
         if !analysis.functions.keys().any(|f| is_shim(shim, f.as_str())) {
