@@ -11,10 +11,28 @@ use crate::metrics::binary::analyze_elf;
 /// for some harness, is it the case that it actually brings in the
 /// functions used in the harness?
 
+// Contains the names of Tock shim functions that must be present.
+// Sorted by driver:
+// - alarm.rs
+// - button.rs
+// - console.rs
+// - led.rs
+// - spi_peripheral.rs
+// - stream.rs
+// These aren't _technically_ shims, but their presence
+// means the shims get called.
 mod tock_shims {
-    // These aren't _technically_ shims, but their presence
-    // means the shims get called.
-    pub const BUTTON_REQUIRED_SHIMS: &[&str] = &[
+    pub const ALARM_SHIMS: &[&str] = &[
+        "KEEP_ALARM_NEW",
+        "KEEP_ALARM_EARLIEST_ALARM",
+        "KEEP_ALARM_PROCESS_REARM_OR_CALLBACK",
+        "KEEP_ALARM_REARM_U32_LEFT_JUSTIFIED_EXPIRATION",
+        "KEEP_ALARM_COMMAND",
+        "KEEP_ALARM_ALLOCATE_GRANT",
+        "KEEP_ALARM_ALARM",
+    ];
+
+    pub const BUTTON_SHIMS: &[&str] = &[
         "KEEP_BUTTON_NEW",
         "KEEP_BUTTON_GET_BUTTON_STATE",
         "KEEP_BUTTON_COMMAND",
@@ -37,7 +55,7 @@ pub fn check_elf_invariant(repo_root: &Path, elf_path: &Path) -> bool {
         println!("func: {}", demangle(func));
     }
 
-    let all_shims = tock_shims::BUTTON_REQUIRED_SHIMS;
+    let all_shims = tock_shims::BUTTON_SHIMS;
     for shim in all_shims {
         if !analysis.functions.keys().any(|f| is_shim(shim, f.as_str())) {
             println!("Missing required shim: {}", shim);

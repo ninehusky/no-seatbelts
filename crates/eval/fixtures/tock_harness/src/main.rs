@@ -18,6 +18,7 @@ mod lib;
 
 use core::panic::PanicInfo;
 
+use lib::alarm::KEEP_ALARM_NEW;
 use lib::button::KEEP_BUTTON_ALLOCATE_GRANT;
 use lib::button::KEEP_BUTTON_COMMAND;
 
@@ -32,6 +33,7 @@ pub extern "C" fn main() -> ! {
     unsafe {
         core::ptr::read_volatile(&KEEP_BUTTON_COMMAND);
         core::ptr::read_volatile(&KEEP_BUTTON_ALLOCATE_GRANT);
+        core::ptr::read_volatile(&KEEP_ALARM_NEW);
     }
 
     loop {}
