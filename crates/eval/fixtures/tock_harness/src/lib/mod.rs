@@ -26,28 +26,24 @@ impl gpio::Output for HarnessPin {
 
 impl gpio::Configure for HarnessPin {
     fn make_input(&self) -> Configuration {
-        todo!()
+        Configuration::Input
     }
     fn make_output(&self) -> Configuration {
-        todo!()
+        Configuration::Input
     }
 
     fn configuration(&self) -> Configuration {
-        todo!()
+        Configuration::Input
     }
     fn disable_output(&self) -> Configuration {
-        todo!()
+        Configuration::Input
     }
     fn disable_input(&self) -> Configuration {
-        todo!()
+        Configuration::Input
     }
-    fn deactivate_to_low_power(&self) {
-        todo!()
-    }
-    fn set_floating_state(&self, _: FloatingState) {
-        todo!()
-    }
+    fn deactivate_to_low_power(&self) {}
+    fn set_floating_state(&self, _: FloatingState) {}
     fn floating_state(&self) -> FloatingState {
-        todo!()
+        FloatingState::PullNone
     }
 }
