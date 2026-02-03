@@ -6,6 +6,7 @@ pub mod button;
 pub mod console;
 pub mod led;
 pub mod spi_peripheral;
+pub mod stream;
 
 pub struct HarnessPin;
 

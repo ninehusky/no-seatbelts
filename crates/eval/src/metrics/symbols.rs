@@ -54,6 +54,32 @@ mod tock_shims {
         "KEEP_LEDHIGH_TOGGLE",
         "KEEP_LEDHIGH_READ",
     ];
+
+    pub const SPI_PERIPHERAL_SHIMS: &[&str] = &[
+        "KEEP_SPI_PERIPHERAL_NEW",
+        "KEEP_SPI_PERIPHERAL_CONFIG_BUFFERS",
+        "KEEP_SPI_PERIPHERAL_READ_WRITE_DONE",
+        "KEEP_SPI_PERIPHERAL_ALLOCATE_GRANT",
+        "KEEP_SPI_PERIPHERAL_CHIP_SELECTED",
+    ];
+
+    pub const STREAM_SHIMS: &[&str] = &[
+        "KEEP_STREAM_SRESULT_IS_DONE",
+        "KEEP_STREAM_SRESULT_IS_ERR",
+        "KEEP_STREAM_SRESULT_DONE",
+        "KEEP_STREAM_SRESULT_NEEDED",
+        "KEEP_STREAM_SRESULT_ERR",
+        "KEEP_STREAM_ENCODE_U8",
+        "KEEP_STREAM_ENCODE_U16",
+        "KEEP_STREAM_ENCODE_U32",
+        "KEEP_STREAM_ENCODE_BYTES",
+        "KEEP_STREAM_ENCODE_BYTES_BE",
+        "KEEP_STREAM_DECODE_U8",
+        "KEEP_STREAM_DECODE_U16",
+        "KEEP_STREAM_DECODE_U32",
+        "KEEP_STREAM_DECODE_BYTES",
+        "KEEP_STREAM_DECODE_BYTES_BE",
+    ];
 }
 
 fn is_shim(shim_name: &str, fn_name: &str) -> bool {
@@ -75,6 +101,8 @@ pub fn check_elf_invariant(repo_root: &Path, elf_path: &Path) -> bool {
         tock_shims::BUTTON_SHIMS,
         tock_shims::CONSOLE_SHIMS,
         tock_shims::LED_SHIMS,
+        tock_shims::SPI_PERIPHERAL_SHIMS,
+        tock_shims::STREAM_SHIMS,
     ]
     .concat();
 

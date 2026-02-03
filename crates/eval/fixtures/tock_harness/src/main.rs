@@ -14,6 +14,9 @@
 // - SPI Peripheral
 // - Stream
 
+// Andrew note: get panic log with: cargo run -p eval .../fixtures/tock_harness/ > panic_log.log
+// compile in docker with:
+// /work/crates/eval/fixtures/tock_harness# RUSTFLAGS="-C link-arg=-nostdlib" cargo build --manifest-path ./Cargo.toml --release --bin tock_harness --target thumbv7em-none-eabi
 mod lib;
 
 use core::panic::PanicInfo;

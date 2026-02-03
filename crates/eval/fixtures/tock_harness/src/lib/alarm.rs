@@ -6,6 +6,7 @@ use kernel::hil::time::{Alarm, AlarmClient, Freq100MHz, Frequency, Ticks, Ticks3
 use kernel::syscall::SyscallDriver;
 use kernel::utilities::cells::OptionalCell;
 
+use core::hint::unreachable_unchecked;
 use core::marker::PhantomData;
 
 #[used]
@@ -84,22 +85,22 @@ impl<'a, T: Ticks, F: Frequency> Alarm<'a> for MockAlarm<'a, T, F> {
     }
 
     fn set_alarm(&self, _reference: Self::Ticks, _dt: Self::Ticks) {
-        unimplemented!()
+        unsafe { unreachable_unchecked() }
     }
 
     fn get_alarm(&self) -> Self::Ticks {
-        unimplemented!()
+        unsafe { unreachable_unchecked() }
     }
 
     fn disarm(&self) -> Result<(), ErrorCode> {
-        unimplemented!()
+        unsafe { unreachable_unchecked() }
     }
 
     fn is_armed(&self) -> bool {
-        unimplemented!()
+        unsafe { unreachable_unchecked() }
     }
 
     fn minimum_dt(&self) -> Self::Ticks {
-        unimplemented!()
+        unsafe { unreachable_unchecked() }
     }
 }
