@@ -22,15 +22,7 @@ use crate::metrics::binary::analyze_elf;
 // These aren't _technically_ shims, but their presence
 // means the shims get called.
 mod tock_shims {
-    pub const ALARM_SHIMS: &[&str] = &[
-        "KEEP_ALARM_NEW",
-        // "KEEP_ALARM_EARLIEST_ALARM",
-        // "KEEP_ALARM_PROCESS_REARM_OR_CALLBACK",
-        // "KEEP_ALARM_REARM_U32_LEFT_JUSTIFIED_EXPIRATION",
-        "KEEP_ALARM_COMMAND",
-        // "KEEP_ALARM_ALLOCATE_GRANT",
-        "KEEP_ALARM_ALARM",
-    ];
+    pub const ALARM_SHIMS: &[&str] = &["KEEP_ALARM_NEW", "KEEP_ALARM_COMMAND", "KEEP_ALARM_ALARM"];
 
     pub const BUTTON_SHIMS: &[&str] = &[
         "KEEP_BUTTON_NEW",
@@ -46,6 +38,21 @@ mod tock_shims {
         "KEEP_CONSOLE_ALLOCATE_GRANT",
         "KEEP_CONSOLE_TRANSMITTED_BUFFER",
         "KEEP_CONSOLE_RECEIVED_BUFFER",
+    ];
+
+    pub const LED_SHIMS: &[&str] = &[
+        "KEEP_LEDLOW_NEW",
+        "KEEP_LEDLOW_INIT",
+        "KEEP_LEDLOW_ON",
+        "KEEP_LEDLOW_OFF",
+        "KEEP_LEDLOW_TOGGLE",
+        "KEEP_LEDLOW_READ",
+        "KEEP_LEDHIGH_NEW",
+        "KEEP_LEDHIGH_INIT",
+        "KEEP_LEDHIGH_ON",
+        "KEEP_LEDHIGH_OFF",
+        "KEEP_LEDHIGH_TOGGLE",
+        "KEEP_LEDHIGH_READ",
     ];
 }
 
@@ -67,6 +74,7 @@ pub fn check_elf_invariant(repo_root: &Path, elf_path: &Path) -> bool {
         tock_shims::ALARM_SHIMS,
         tock_shims::BUTTON_SHIMS,
         tock_shims::CONSOLE_SHIMS,
+        tock_shims::LED_SHIMS,
     ]
     .concat();
 

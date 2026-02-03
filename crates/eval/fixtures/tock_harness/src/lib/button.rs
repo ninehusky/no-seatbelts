@@ -18,6 +18,8 @@ use kernel::syscall::SyscallDriver;
 use capsules_core::button::Button;
 use capsules_core::console::Console;
 
+use crate::lib::HarnessPin;
+
 // button.rs
 // We need to bring in:
 // - <Button as InterruptPin>::new
@@ -86,50 +88,6 @@ type ButtonPins<'a> = &'a [(
 
 type ButtonGrant =
     kernel::grant::Grant<button::App, UpcallCount<1>, AllowRoCount<0>, AllowRwCount<0>>;
-
-pub struct HarnessPin;
-
-impl gpio::Input for HarnessPin {
-    fn read(&self) -> bool {
-        false
-    }
-}
-
-impl gpio::Output for HarnessPin {
-    fn set(&self) {}
-    fn clear(&self) {}
-    fn toggle(&self) -> bool {
-        false
-    }
-}
-
-impl gpio::Configure for HarnessPin {
-    fn make_input(&self) -> Configuration {
-        todo!()
-    }
-    fn make_output(&self) -> Configuration {
-        todo!()
-    }
-
-    fn configuration(&self) -> Configuration {
-        todo!()
-    }
-    fn disable_output(&self) -> Configuration {
-        todo!()
-    }
-    fn disable_input(&self) -> Configuration {
-        todo!()
-    }
-    fn deactivate_to_low_power(&self) {
-        todo!()
-    }
-    fn set_floating_state(&self, _: FloatingState) {
-        todo!()
-    }
-    fn floating_state(&self) -> FloatingState {
-        todo!()
-    }
-}
 
 impl<'a> gpio::Interrupt<'a> for HarnessPin {
     fn set_client(&self, _client: &'a dyn gpio::Client) {}
