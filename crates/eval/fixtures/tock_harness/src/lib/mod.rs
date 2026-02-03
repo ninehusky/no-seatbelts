@@ -5,6 +5,7 @@ pub mod alarm;
 pub mod button;
 pub mod console;
 pub mod led;
+pub mod spi_peripheral;
 
 pub struct HarnessPin;
 
