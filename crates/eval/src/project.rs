@@ -53,10 +53,12 @@ pub fn prepare_temp_projects(repo_root: &Path, project_dir: &Path) -> (TempDir, 
 
 pub fn find_elf(project_dir: &Path) -> std::path::PathBuf {
     let target = "thumbv7em-none-eabi";
-    let exec_name = "tock_harness";
+    let exec_name = "tock";
     // let target = "riscv32imac-unknown-none-elf";
     // let exec_name = "hifive1";
-    let target_dir = project_dir.join("target").join(target).join("release");
+    // let target_dir = project_dir.join("target").join(target).join("release");
+    let target_dir = project_dir;
+    return project_dir.to_path_buf();
     println!("target dir: {}", target_dir.display());
     for entry in fs::read_dir(target_dir).expect("failed to read target/release/deps") {
         let entry = entry.expect("failed to read entry");

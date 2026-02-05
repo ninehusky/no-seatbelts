@@ -34,7 +34,18 @@ fn main() {
     let args = EvalArgs::parse();
 
     // Just get the invariant code running for now.
-    symbols::check_elf_invariant(&repo_root, &args.src_path);
+    // symbols::check_elf_invariant(&repo_root, &args.src_path);
+
+    // just the regular path. current_dir/tock_harness_no_panic
+    let og_elf_path = repo_root.join("tock_harness_original");
+    let no_panic_elf_path = repo_root.join("tock_harness_no_panic");
+    // get the ELF analysis as usual.
+    let og_summary = analyze_elf(&repo_root, &og_elf_path);
+    let no_panic_summary = analyze_elf(&repo_root, &no_panic_elf_path);
+
+    println!("Original summary:\n{}", og_summary.summary);
+    println!("No-panic summary:\n{}", no_panic_summary.summary);
+
     return;
 
     // 1. Remove previous `fixed` version, if any.
