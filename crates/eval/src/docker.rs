@@ -3,6 +3,32 @@ use std::{
     process::{Command, Output},
 };
 
+use std::path::PathBuf;
+
+use anyhow::Context;
+
+/// The way that the code should be compiled.
+pub struct CompileConfig {
+    pub target: TargetArch,
+    pub bin: Option<String>,
+    pub release: bool,
+}
+
+/// The architectures you can compile to.
+pub enum TargetArch {
+    I686_UNKNOWN_LINUX_GNU,
+    THUMBV7EM_NONE_EABI,
+}
+
+impl TargetArch {
+    pub fn to_rust_target(&self) -> &'static str {
+        match self {
+            TargetArch::I686_UNKNOWN_LINUX_GNU => "i686-unknown-linux-gnu",
+            TargetArch::THUMBV7EM_NONE_EABI => "thumbv7em-none-eabi",
+        }
+    }
+}
+
 pub fn ensure_docker_image() {
     let in_ci = std::env::var("CI").is_ok();
     let force = std::env::var("EVAL_FORCE_DOCKER_BUILD").is_ok();
@@ -12,26 +38,43 @@ pub fn ensure_docker_image() {
     }
 }
 
-pub fn docker_compile(repo_root: &Path, project_dir: &Path) -> Result<(), ()> {
+pub fn docker_compile(
+    mount_dir: &Path,
+    project_dir: &Path,
+    config: &CompileConfig,
+) -> anyhow::Result<Option<PathBuf>> {
     let rel = project_dir
-        .strip_prefix(repo_root)
-        .expect("project_dir not under repo_root");
+        .strip_prefix(mount_dir)
+        .context("project_dir must be under mount_dir")?;
 
-    run_in_docker(
-        repo_root,
-        &[
-            "cargo",
-            "build",
-            "--manifest-path",
-            &format!("/work/{}/Cargo.toml", rel.display()),
-            "--release",
-            "--bin",
-            "ring-buffer-smoketest",
-            "--target",
-            "i686-unknown-linux-gnu",
-        ],
-    );
-    Ok(())
+    let cargo_toml_path = &format!("/work/{}/Cargo.toml", rel.display());
+
+    let mut args = vec!["cargo", "build", "--manifest-path", cargo_toml_path];
+
+    if config.release {
+        args.push("--release");
+    }
+
+    if let Some(bin) = &config.bin {
+        args.push("--bin");
+        args.push(bin);
+    }
+
+    args.push("--target");
+    args.push(config.target.to_rust_target());
+
+    run_in_docker(mount_dir, &args);
+
+    if let Some(elf) = crate::workspace::expected_elf_path(project_dir, config) {
+        if !elf.exists() {
+            anyhow::bail!(
+                "cargo build succeeded, but expected ELF not found at {}",
+                elf.display()
+            );
+        }
+        return Ok(Some(elf));
+    }
+    Ok(None)
 }
 
 pub fn to_container_path(repo_root: &Path, host_path: &Path) -> String {
@@ -41,7 +84,7 @@ pub fn to_container_path(repo_root: &Path, host_path: &Path) -> String {
     format!("/work/{}", rel.display())
 }
 
-pub fn run_in_docker(repo_root: &Path, args: &[&str]) -> Output {
+pub fn run_in_docker(mount_dir: &Path, args: &[&str]) -> anyhow::Result<Output> {
     let output = Command::new("docker")
         .args([
             "run",
@@ -53,19 +96,23 @@ pub fn run_in_docker(repo_root: &Path, args: &[&str]) -> Output {
             "-e",
             "AR=i686-linux-gnu-ar",
             "-v",
-            &format!("{}:/work", repo_root.display()),
+            &format!("{}:/work", mount_dir.display()),
             "no-seatbelts-eval-env",
         ])
         .args(args)
         .output()
         .expect("failed to run docker command");
+
     if !output.status.success() {
-        eprintln!("stdout:\n{}", String::from_utf8_lossy(&output.stdout));
-        eprintln!("stderr:\n{}", String::from_utf8_lossy(&output.stderr));
-        panic!("docker command failed");
+        anyhow::bail!(
+            "Docker command failed with status {}. Stdout:\n{}\nStderr:\n{}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
-    output
+    Ok(output)
 }
 
 fn docker_image_exists(name: &str) -> bool {

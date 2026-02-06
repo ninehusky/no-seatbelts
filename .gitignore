@@ -38,5 +38,8 @@ target
 crates/eval/fixtures/eval-runs/
 *.log
 *.asm
+*.txt
+
 
 outputs/
+build/

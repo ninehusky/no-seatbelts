@@ -7,9 +7,24 @@ use std::{
 
 use rustfix::{CodeFix, Filter, Suggestion};
 
-pub fn run_no_seatbelts(repo_root: &Path, entry: &Path) -> Vec<Suggestion> {
+use crate::workspace::find_build_dir;
+
+/// Runs the no-seatbelts binary on the given file.
+/// The API for this is unstable; once we get no_seatbelts
+/// to run on _crates_, the API will likely change to take a crate root instead of a file.
+/// See #17 for more details.
+/// `workdir` is the directory in which to run no-seatbelts, which should be the root of the edited project.
+/// `file` is the file to run no-seatbelts on, which should be a file in the edited project.
+pub fn run_no_seatbelts(workdir: &Path, file: &Path) -> anyhow::Result<Vec<Suggestion>> {
+    assert!(
+        file.starts_with(workdir),
+        "file must be in the edited project (file: {:?}, workdir: {:?})",
+        file,
+        workdir
+    );
+
     let output = Command::new("cargo")
-        .current_dir(repo_root)
+        .current_dir(find_build_dir()?)
         .args([
             "run",
             "-p",
@@ -17,7 +32,7 @@ pub fn run_no_seatbelts(repo_root: &Path, entry: &Path) -> Vec<Suggestion> {
             "--bin",
             "no-seatbelts",
             "--",
-            entry.to_str().unwrap(),
+            file.to_str().unwrap(),
             "--error-format=json",
             "--no-std",
         ])
@@ -38,12 +53,11 @@ pub fn run_no_seatbelts(repo_root: &Path, entry: &Path) -> Vec<Suggestion> {
         .collect::<Vec<_>>()
         .join("\n");
 
-    rustfix::get_suggestions_from_json(
+    Ok(rustfix::get_suggestions_from_json(
         &json_only,
         &HashSet::<String>::default(),
         Filter::Everything,
-    )
-    .expect("failed to parse suggestions")
+    )?)
 }
 
 pub fn apply_suggestions(suggestions: &Vec<Suggestion>) {
