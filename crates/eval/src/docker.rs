@@ -150,7 +150,11 @@ fn docker_image_exists(name: &str) -> bool {
 }
 
 fn docker_build() -> Result<(), String> {
+    let eval_root = crate::workspace::find_eval_root()
+        .map_err(|e| format!("Failed to find eval root: {}", e))?;
+
     let status = Command::new("docker")
+        .current_dir(&eval_root)
         .args([
             "build",
             "-f",
