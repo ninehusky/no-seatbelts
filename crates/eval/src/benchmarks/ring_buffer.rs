@@ -29,6 +29,7 @@ pub fn run() -> Result<()> {
         release: true,
     };
 
+    // 1. EXPERIMENT 1: Compute overall size deltas.
     let baseline_elf = docker_compile(&eval_root, &prepared.baseline_path, &compile_cfg)?.unwrap();
     let edited_elf = docker_compile(&eval_root, &prepared.edited_path, &compile_cfg)?.unwrap();
 
@@ -42,11 +43,6 @@ pub fn run() -> Result<()> {
             section.clone(),
             (edited_size as i64 - (*baseline_size as i64)) as i64,
         );
-    }
-
-    println!("diff:");
-    for (k, v) in &delta {
-        println!("{}: {}", k, v);
     }
 
     // Part 1: Prepare baseline + transformed source trees.

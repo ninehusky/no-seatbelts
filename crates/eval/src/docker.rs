@@ -27,6 +27,13 @@ impl TargetArch {
             TargetArch::THUMBV7EM_NONE_EABI => "thumbv7em-none-eabi",
         }
     }
+
+    pub fn is_call(&self, instr_name: &str) -> bool {
+        match self {
+            TargetArch::I686_UNKNOWN_LINUX_GNU => instr_name == "call",
+            TargetArch::THUMBV7EM_NONE_EABI => instr_name == "bl",
+        }
+    }
 }
 
 pub fn ensure_docker_image() {
