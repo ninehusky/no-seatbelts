@@ -1,5 +1,4 @@
 use std::{
-    arch::aarch64::int16x4_t,
     path::Path,
     process::{Command, Output},
 };
