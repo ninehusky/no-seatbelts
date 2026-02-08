@@ -14,6 +14,7 @@ use crate::{docker::CompileConfig, transforms::EditMode};
 /// This struct represents the temporary projects created for baseline and changed
 /// versions. You typically want to build one of these through `prepare_benchmark_run`.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct PreparedProjects {
     pub baseline_path: PathBuf,
     pub edited_path: PathBuf,
@@ -120,7 +121,7 @@ pub fn expected_elf_path(project_dir: &Path, cfg: &CompileConfig) -> Option<Path
     Some(
         project_dir
             .join("target")
-            .join(&cfg.target.to_rust_target())
+            .join(cfg.target.to_rust_target())
             .join(profile)
             .join(bin),
     )

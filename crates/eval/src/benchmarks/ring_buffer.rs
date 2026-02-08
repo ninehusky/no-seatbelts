@@ -8,10 +8,11 @@ use crate::{
     },
     docker::{CompileConfig, docker_compile},
     transforms::EditMode,
-    workspace::{self, find_build_dir, find_eval_root, prepare_benchmark_run_auto},
+    workspace::{self, find_build_dir, prepare_benchmark_run_auto},
 };
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct PreparedProjects {
     baseline_path: PathBuf,
     fixed_path: PathBuf,
@@ -21,7 +22,7 @@ struct PreparedProjects {
 
 pub fn run() -> Result<()> {
     let eval_root = workspace::find_eval_root()?;
-    let target = crate::docker::TargetArch::I686_UNKNOWN_LINUX_GNU;
+    let target = crate::docker::TargetArch::I686UnknownLinuxGnu;
     let benchmark_name = "ring_buffer";
     let prepared = prepare_benchmark_run_auto(
         benchmark_name,
@@ -45,7 +46,7 @@ pub fn run() -> Result<()> {
     let function_summary = functions::get_function_summary(&target, &baseline_elf, &edited_elf)?;
 
     // Also, as a helpful utility, find all the panic calls in the edited version.
-    let panics = functions::find_panics(&function_summary.edited);
+    let panics = functions::find_panics(function_summary.edited.functions.clone());
 
     // Once done with both experiments, clone results to a final folder for persistence and reporting.
     let final_folder = find_build_dir()?.join("benchmarks").join(benchmark_name);

@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use anyhow::Context;
-use chrono::format::parse;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -26,7 +25,7 @@ pub fn get_delta(baseline: &SectionSizes, edited: &SectionSizes) -> SectionSizeD
         let edited_size = edited.get(section).copied().unwrap_or(0);
         delta.insert(
             section.clone(),
-            (edited_size as i64 - (*baseline_size as i64)) as i64,
+            edited_size as i64 - (*baseline_size as i64) ,
         );
     }
     delta

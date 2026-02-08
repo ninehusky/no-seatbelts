@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::Hash, path::Path};
+use std::{collections::HashMap, path::Path};
 
 use anyhow::Context;
 use regex::Regex;
@@ -9,13 +9,29 @@ use crate::{
     workspace::find_eval_root,
 };
 
-pub type GlobalFunctionInfo = HashMap<String, FunctionInfo>;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionSummaryAnalysis {
     pub baseline: GlobalFunctionInfo,
     pub edited: GlobalFunctionInfo,
+    pub delta: GlobalFunctionDelta,
+}
+
+pub type FunctionLookup = HashMap<String, FunctionInfo>;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GlobalFunctionInfo {
+    pub functions: FunctionLookup,
+    pub total_calls: u64,
+    pub total_instrs: u64,
+    pub total_panic_calls: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GlobalFunctionDelta {
     pub delta: Vec<FunctionDelta>,
+    pub total_instrs_delta: i64,
+    pub total_calls_delta: i64,
+    pub total_panic_calls_delta: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,11 +59,11 @@ pub struct PanicCallInfo {
 }
 
 // Finds the panic calls in the given GlobalFunctionInfo and returns them as a flat vector.
-pub fn find_panics(info: &GlobalFunctionInfo) -> Vec<&PanicCallInfo> {
+pub fn find_panics(fn_summary: FunctionLookup) -> Vec<PanicCallInfo> {
     let mut panics = vec![];
-    for fn_info in info.values() {
+    for fn_info in fn_summary.values() {
         for panic_call in &fn_info.panic_calls {
-            panics.push(panic_call);
+            panics.push(panic_call.clone());
         }
     }
     panics
@@ -61,10 +77,10 @@ pub fn get_function_summary(
     let baseline_info = get_global_fn_info(target, baseline_elf_path)?;
     let edited_info = get_global_fn_info(target, edited_elf_path)?;
 
-    let mut delta = vec![];
-    for (name, base_fn) in &baseline_info {
-        if let Some(edited_fn) = edited_info.get(name) {
-            delta.push(FunctionDelta {
+    let mut fn_delta = vec![];
+    for (name, base_fn) in &baseline_info.functions {
+        if let Some(edited_fn) = edited_info.functions.get(name) {
+            fn_delta.push(FunctionDelta {
                 name: name.clone(),
                 num_instrs_delta: edited_fn.num_instrs as i64 - base_fn.num_instrs as i64,
                 num_calls_delta: edited_fn.num_calls as i64 - base_fn.num_calls as i64,
@@ -74,10 +90,18 @@ pub fn get_function_summary(
         }
     }
 
+    let global_delta = GlobalFunctionDelta {
+        delta: fn_delta,
+        total_instrs_delta: edited_info.total_instrs as i64 - baseline_info.total_instrs as i64,
+        total_calls_delta: edited_info.total_calls as i64 - baseline_info.total_calls as i64,
+        total_panic_calls_delta: edited_info.total_panic_calls as i64
+            - baseline_info.total_panic_calls as i64,
+    };
+
     Ok(FunctionSummaryAnalysis {
         baseline: baseline_info,
         edited: edited_info,
-        delta,
+        delta: global_delta,
     })
 }
 
@@ -101,7 +125,19 @@ pub fn get_global_fn_info(
         fn_infos.insert(name, info);
     }
 
-    Ok(fn_infos)
+    let total_calls = fn_infos.values().map(|info| info.num_calls).sum();
+    let total_instrs = fn_infos.values().map(|info| info.num_instrs).sum();
+    let total_panic_calls = fn_infos
+        .values()
+        .map(|info| info.panic_calls.len() as u64)
+        .sum();
+
+    Ok(GlobalFunctionInfo {
+        functions: fn_infos,
+        total_calls,
+        total_instrs,
+        total_panic_calls,
+    })
 }
 
 // Build the FunctionInfo for a single function given its name and instructions.
@@ -191,6 +227,7 @@ fn extract_panic_callee(asm: &str) -> Option<String> {
 }
 
 // A single assembly instruction.
+#[allow(dead_code)]
 struct Instr {
     text: String,
     addr: u64,

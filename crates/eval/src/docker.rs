@@ -15,25 +15,25 @@ pub struct CompileConfig {
 }
 
 /// The architectures you can compile to.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum TargetArch {
-    I686_UNKNOWN_LINUX_GNU,
-    THUMBV7EM_NONE_EABI,
+    I686UnknownLinuxGnu,
+    Thumbv7emNoneEabi,
 }
 
 impl TargetArch {
     pub fn to_rust_target(&self) -> &'static str {
         match self {
-            TargetArch::I686_UNKNOWN_LINUX_GNU => "i686-unknown-linux-gnu",
-            TargetArch::THUMBV7EM_NONE_EABI => "thumbv7em-none-eabi",
+            TargetArch::I686UnknownLinuxGnu => "i686-unknown-linux-gnu",
+            TargetArch::Thumbv7emNoneEabi => "thumbv7em-none-eabi",
         }
     }
 
     pub fn is_call(&self, instr: &str) -> bool {
         // Get rid of the leading instruction address: just look at the mnemonic.
         fn mnemonic(asm: &str) -> &str {
-            asm.trim_start()
-                .split_whitespace()
+            asm.split_whitespace()
                 .find(|tok| {
                     // skip pure hex prefix bytes like "65", "f3", etc.
                     !tok.chars().all(|c| c.is_ascii_hexdigit())
@@ -44,8 +44,8 @@ impl TargetArch {
         let mnemonic = mnemonic(instr);
 
         match self {
-            TargetArch::I686_UNKNOWN_LINUX_GNU => mnemonic.starts_with("call"),
-            TargetArch::THUMBV7EM_NONE_EABI => mnemonic.starts_with("bl"),
+            TargetArch::I686UnknownLinuxGnu => mnemonic.starts_with("call"),
+            TargetArch::Thumbv7emNoneEabi => mnemonic.starts_with("bl"),
         }
     }
 }
