@@ -1,4 +1,5 @@
 use std::{
+    arch::aarch64::int16x4_t,
     path::Path,
     process::{Command, Output},
 };
@@ -15,6 +16,7 @@ pub struct CompileConfig {
 }
 
 /// The architectures you can compile to.
+#[derive(Debug, Clone)]
 pub enum TargetArch {
     I686_UNKNOWN_LINUX_GNU,
     THUMBV7EM_NONE_EABI,
@@ -28,10 +30,23 @@ impl TargetArch {
         }
     }
 
-    pub fn is_call(&self, instr_name: &str) -> bool {
+    pub fn is_call(&self, instr: &str) -> bool {
+        // Get rid of the leading instruction address: just look at the mnemonic.
+        fn mnemonic(asm: &str) -> &str {
+            asm.trim_start()
+                .split_whitespace()
+                .find(|tok| {
+                    // skip pure hex prefix bytes like "65", "f3", etc.
+                    !tok.chars().all(|c| c.is_ascii_hexdigit())
+                })
+                .unwrap_or("")
+        }
+
+        let mnemonic = mnemonic(instr);
+
         match self {
-            TargetArch::I686_UNKNOWN_LINUX_GNU => instr_name == "call",
-            TargetArch::THUMBV7EM_NONE_EABI => instr_name == "bl",
+            TargetArch::I686_UNKNOWN_LINUX_GNU => mnemonic.starts_with("call"),
+            TargetArch::THUMBV7EM_NONE_EABI => mnemonic.starts_with("bl"),
         }
     }
 }
@@ -50,6 +65,9 @@ pub fn docker_compile(
     project_dir: &Path,
     config: &CompileConfig,
 ) -> anyhow::Result<Option<PathBuf>> {
+    // 1. Make sure the Docker image is built.
+    ensure_docker_image();
+
     let rel = project_dir
         .strip_prefix(mount_dir)
         .context("project_dir must be under mount_dir")?;
@@ -70,7 +88,7 @@ pub fn docker_compile(
     args.push("--target");
     args.push(config.target.to_rust_target());
 
-    run_in_docker(mount_dir, &args);
+    run_in_docker(mount_dir, &args)?;
 
     if let Some(elf) = crate::workspace::expected_elf_path(project_dir, config) {
         if !elf.exists() {
@@ -92,6 +110,8 @@ pub fn to_container_path(repo_root: &Path, host_path: &Path) -> String {
 }
 
 pub fn run_in_docker(mount_dir: &Path, args: &[&str]) -> anyhow::Result<Output> {
+    ensure_docker_image();
+
     let output = Command::new("docker")
         .args([
             "run",

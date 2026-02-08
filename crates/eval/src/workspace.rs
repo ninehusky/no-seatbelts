@@ -5,11 +5,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::docker::CompileConfig;
-use crate::{
-    docker::TargetArch,
-    transforms::no_seatbelts::{apply_suggestions, run_no_seatbelts},
+use crate::transforms::{
+    EditSummary,
+    no_seatbelts::{apply_suggestions, run_no_seatbelts},
 };
+use crate::{docker::CompileConfig, transforms::EditMode};
 
 /// This struct represents the temporary projects created for baseline and changed
 /// versions. You typically want to build one of these through `prepare_benchmark_run`.
@@ -17,12 +17,7 @@ use crate::{
 pub struct PreparedProjects {
     pub baseline_path: PathBuf,
     pub edited_path: PathBuf,
-}
-
-/// The transformations to apply to the edited project, if any.
-pub enum EditMode {
-    None,
-    NoSeatbelts,
+    pub edit_summary: EditSummary,
 }
 
 /// Finds the root of the eval crate, which is expected to be the current working directory.
@@ -98,18 +93,22 @@ pub fn prepare_benchmark_run_auto(
     add_empty_workspace(baseline_path.join("Cargo.toml"));
     add_empty_workspace(edited_path.join("Cargo.toml"));
 
+    let mut edit_summary = EditSummary::default();
     // 4. Apply transformations to the edited version, if needed.
     match edit_mode {
         EditMode::None => {}
         EditMode::NoSeatbelts => {
             let edits = run_no_seatbelts(&edited_path, &edited_path.join("src").join("lib.rs"))?;
             apply_suggestions(&edits);
+            edit_summary.edit_mode = edit_mode;
+            edit_summary.suggestions = edits.iter().map(|s| format!("{:?}", s)).collect();
         }
     };
 
     Ok(PreparedProjects {
         baseline_path,
         edited_path,
+        edit_summary,
     })
 }
 

@@ -2,14 +2,53 @@ use std::path::Path;
 
 use anyhow::Context;
 use chrono::format::parse;
+use serde::{Deserialize, Serialize};
 
 use crate::{
-    analysis::SectionSizes,
-    docker::{run_in_docker, to_container_path},
+    docker::{TargetArch, run_in_docker, to_container_path},
     workspace::find_eval_root,
 };
 
-pub fn get_section_sizes(elf: &Path) -> anyhow::Result<SectionSizes> {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SectionSizeAnalysis {
+    pub baseline: SectionSizes,
+    pub edited: SectionSizes,
+    pub delta: SectionSizeDeltas,
+}
+
+pub type SectionSizes = std::collections::BTreeMap<String, u64>;
+pub type SectionSizeDeltas = std::collections::BTreeMap<String, i64>;
+
+/// Compute the section size deltas between the baseline and edited versions.
+pub fn get_delta(baseline: &SectionSizes, edited: &SectionSizes) -> SectionSizeDeltas {
+    let mut delta: SectionSizeDeltas = Default::default();
+    for (section, baseline_size) in baseline.iter() {
+        let edited_size = edited.get(section).copied().unwrap_or(0);
+        delta.insert(
+            section.clone(),
+            (edited_size as i64 - (*baseline_size as i64)) as i64,
+        );
+    }
+    delta
+}
+
+pub fn get_section_size_summary(
+    _target: &TargetArch,
+    baseline_elf_path: &Path,
+    edited_elf_path: &Path,
+) -> anyhow::Result<SectionSizeAnalysis> {
+    let baseline_sizes = get_section_sizes(baseline_elf_path)?;
+    let edited_sizes = get_section_sizes(edited_elf_path)?;
+
+    let delta = get_delta(&baseline_sizes, &edited_sizes);
+
+    Ok(SectionSizeAnalysis {
+        baseline: baseline_sizes,
+        edited: edited_sizes,
+        delta,
+    })
+}
+fn get_section_sizes(elf: &Path) -> anyhow::Result<SectionSizes> {
     let elf_path = to_container_path(&find_eval_root()?, elf);
     let output = run_in_docker(&find_eval_root()?, &["llvm-readelf", "-S", &elf_path])?;
 
