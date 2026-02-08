@@ -158,7 +158,7 @@ fn docker_build() -> Result<(), String> {
         .args([
             "build",
             "-f",
-            "crates/eval/docker/Dockerfile",
+            "docker/Dockerfile",
             "-t",
             "no-seatbelts-eval-env",
             ".",
