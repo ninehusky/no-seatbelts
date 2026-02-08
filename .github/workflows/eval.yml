@@ -17,12 +17,11 @@ jobs:
         run: >
           cargo run
           -p eval
-          --
-          crates/eval/fixtures/ring_buffer/src/lib.rs
+          ring-buffer
       
       - name: Upload panic metrics
         uses: actions/upload-artifact@v4
         with:
           name: ring-buffer-panic-metrics
-          path: crates/eval/fixtures/eval-runs/latest
+          path: crates/eval/fixtures/eval-runs/latest/benchmarks/ring-buffer/
 
