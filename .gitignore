@@ -36,3 +36,10 @@ target
 
 # eval/fixutres/eval-runs
 crates/eval/fixtures/eval-runs/
+*.log
+*.asm
+*.txt
+
+
+outputs/
+build/

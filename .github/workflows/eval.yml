@@ -14,15 +14,13 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
 
       - name: Run eval on ring_buffer
-        run: >
-          cargo run
-          -p eval
-          --
-          crates/eval/fixtures/ring_buffer/src/lib.rs
+        run: |
+          cd crates/eval
+          cargo run -p eval ring-buffer
       
       - name: Upload panic metrics
         uses: actions/upload-artifact@v4
         with:
           name: ring-buffer-panic-metrics
-          path: crates/eval/fixtures/eval-runs/latest
+          path: crates/eval/build/
 
