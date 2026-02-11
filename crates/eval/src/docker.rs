@@ -20,11 +20,13 @@ pub struct CompileConfig {
 pub enum TargetArch {
     I686UnknownLinuxGnu,
     Thumbv7emNoneEabi,
+    X86_64UnknownLinuxGnu,
 }
 
 impl TargetArch {
     pub fn to_rust_target(&self) -> &'static str {
         match self {
+            TargetArch::X86_64UnknownLinuxGnu => "x86_64-unknown-linux-gnu",
             TargetArch::I686UnknownLinuxGnu => "i686-unknown-linux-gnu",
             TargetArch::Thumbv7emNoneEabi => "thumbv7em-none-eabi",
         }
@@ -44,7 +46,9 @@ impl TargetArch {
         let mnemonic = mnemonic(instr);
 
         match self {
-            TargetArch::I686UnknownLinuxGnu => mnemonic.starts_with("call"),
+            TargetArch::X86_64UnknownLinuxGnu | TargetArch::I686UnknownLinuxGnu => {
+                mnemonic.starts_with("call")
+            }
             TargetArch::Thumbv7emNoneEabi => mnemonic.starts_with("bl"),
         }
     }
@@ -115,8 +119,9 @@ pub fn run_in_docker(mount_dir: &Path, args: &[&str]) -> anyhow::Result<Output> 
         .args([
             "run",
             "--rm",
-            "-e",
-            "RUSTFLAGS=-C link-arg=-nostdlib",
+            "--platform=linux/amd64",
+            // "-e",
+            // "RUSTFLAGS=-C link-arg=-nostdlib",
             "-e",
             "CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER=i686-linux-gnu-gcc",
             "-e",
@@ -157,6 +162,7 @@ fn docker_build() -> Result<(), String> {
         .current_dir(&eval_root)
         .args([
             "build",
+            "--platform=linux/amd64",
             "-f",
             "docker/Dockerfile",
             "-t",

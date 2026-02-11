@@ -1,6 +1,8 @@
 use clap::ValueEnum;
 
 pub mod ring_buffer;
+pub mod survey;
+pub mod tock_harness;
 
 #[derive(Debug, Clone, ValueEnum)]
 pub enum Benchmark {
@@ -10,4 +12,6 @@ pub enum Benchmark {
     TockHarness,
     /// The Tock capsules core crate.
     TockCapsulesCore,
+    /// A series of representative Rust crates.
+    Survey,
 }
