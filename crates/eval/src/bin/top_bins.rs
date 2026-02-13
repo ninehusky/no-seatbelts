@@ -27,7 +27,7 @@ struct VersionsResponse {
 
 #[derive(Deserialize)]
 struct Version {
-    num: String,
+    _num: String,
     bin_names: Option<Vec<String>>,
 }
 
@@ -94,7 +94,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         };
 
-        if is_binary_version(&version_resp.versions.last().unwrap()) {
+        if is_binary_version(version_resp.versions.last().unwrap()) {
             binaries.push(BinaryCrate {
                 name: krate.name,
                 version: krate.max_version,

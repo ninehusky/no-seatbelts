@@ -6,9 +6,7 @@ use crate::{
         functions,
         size::{self},
     },
-    docker::{CompileConfig, docker_compile},
-    transforms::EditMode,
-    workspace::{self, find_build_dir, find_eval_root, prepare_benchmark_run_auto},
+    workspace::{find_build_dir, find_eval_root},
 };
 
 #[derive(Debug, Clone)]
@@ -21,7 +19,6 @@ struct PreparedProjects {
 }
 
 pub fn run() -> Result<()> {
-    let eval_root = workspace::find_eval_root()?;
     let benchmark_name = "tock_harness";
     let target = crate::docker::TargetArch::Thumbv7emNoneEabi;
 
