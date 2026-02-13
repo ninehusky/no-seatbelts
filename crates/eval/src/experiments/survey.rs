@@ -128,12 +128,13 @@ pub fn run() -> anyhow::Result<()> {
 
         binary_reports.push(BinaryPanicReport {
             name: krate.name.clone(),
-            num_calls: function_summary.edited.functions.len() as u64,
-            num_panics: panics.len() as u64,
-            panic_proportion: if function_summary.edited.functions.is_empty() {
+            num_calls: function_summary.baseline.total_calls,
+            num_panics: function_summary.baseline.total_panic_calls,
+            panic_proportion: if function_summary.baseline.total_calls == 0 {
                 0.0
             } else {
-                panics.len() as f64 / function_summary.edited.functions.len() as f64
+                function_summary.baseline.total_panic_calls as f64
+                    / function_summary.baseline.total_calls as f64
             },
         });
 
