@@ -24,3 +24,23 @@ jobs:
           name: ring-buffer-panic-metrics
           path: crates/eval/build/
 
+  survey:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Run survey
+        run: |
+          cd crates/eval
+          cargo run -p eval --bin eval survey
+      
+      - name: Upload panic metrics
+        uses: actions/upload-artifact@v4
+        with:
+          name: survey-panic-metrics
+          path: crates/eval/build/
+
+
