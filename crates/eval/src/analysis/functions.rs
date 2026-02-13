@@ -116,6 +116,7 @@ pub fn get_global_fn_info(
             "-D",
             &to_container_path(&find_eval_root()?, elf_path),
         ],
+        &[],
     )?;
 
     let fns = extract_functions(&String::from_utf8_lossy(&disasm.stdout))?;

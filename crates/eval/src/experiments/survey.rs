@@ -58,6 +58,7 @@ pub fn run() -> anyhow::Result<()> {
             // target: crate::docker::TargetArch::X86_64UnknownLinuxGnu,
             bin: Some(krate.exec_name.clone()),
             release: true,
+            exclude_std: false,
         };
 
         // 2. Clone the repo if it exists.
