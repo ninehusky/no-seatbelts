@@ -13,6 +13,22 @@ struct BinaryCrate {
     repository: Option<String>,
 }
 
+#[derive(Serialize, Deserialize)]
+struct BinaryPanicReport {
+    name: String,
+    num_calls: u64,
+    num_panics: u64,
+    panic_proportion: f64,
+}
+
+#[derive(Serialize, Deserialize)]
+struct SurveyReport {
+    binary_reports: Vec<BinaryPanicReport>,
+    total_calls: u64,
+    total_panics: u64,
+    panic_proportion: f64,
+}
+
 fn to_cloneable_url(repo: &str) -> Option<String> {
     if repo.starts_with("http") {
         Some(format!("{}.git", repo.trim_end_matches(".git")))
@@ -33,6 +49,9 @@ pub fn run() -> anyhow::Result<()> {
     let crates = crate::workspace::find_eval_root()?.join("data/interesting_crates.json");
     let data = std::fs::read_to_string(crates)?;
     let interesting_crates: Vec<BinaryCrate> = serde_json::from_str(&data)?;
+
+    let mut binary_reports = Vec::new();
+
     for krate in interesting_crates {
         let cfg = CompileConfig {
             target: crate::docker::TargetArch::I686UnknownLinuxGnu,
@@ -107,6 +126,17 @@ pub fn run() -> anyhow::Result<()> {
         let panics =
             crate::analysis::functions::find_panics(function_summary.edited.functions.clone());
 
+        binary_reports.push(BinaryPanicReport {
+            name: krate.name.clone(),
+            num_calls: function_summary.edited.functions.len() as u64,
+            num_panics: panics.len() as u64,
+            panic_proportion: if function_summary.edited.functions.is_empty() {
+                0.0
+            } else {
+                panics.len() as f64 / function_summary.edited.functions.len() as f64
+            },
+        });
+
         // Once done with both experiments, clone results to a final folder for persistence and reporting.
         let final_folder = find_build_dir()?
             .join("benchmarks")
@@ -131,6 +161,27 @@ pub fn run() -> anyhow::Result<()> {
             serde_json::to_string_pretty(&panics)?,
         )?;
     }
+
+    // 5. Generate a report summarizing the results.
+    let survey_report = SurveyReport {
+        total_calls: binary_reports.iter().map(|r| r.num_calls).sum(),
+        total_panics: binary_reports.iter().map(|r| r.num_panics).sum(),
+        panic_proportion: if binary_reports.iter().map(|r| r.num_calls).sum::<u64>() == 0 {
+            0.0
+        } else {
+            binary_reports.iter().map(|r| r.num_panics).sum::<u64>() as f64
+                / binary_reports.iter().map(|r| r.num_calls).sum::<u64>() as f64
+        },
+        binary_reports,
+    };
+
+    std::fs::write(
+        find_build_dir()?
+            .join("benchmarks")
+            .join("survey_repos")
+            .join("survey_report.json"),
+        serde_json::to_string_pretty(&survey_report)?,
+    )?;
 
     Ok(())
 }
