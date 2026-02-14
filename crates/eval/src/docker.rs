@@ -170,17 +170,30 @@ fn docker_build() -> Result<(), String> {
     let eval_root = crate::workspace::find_eval_root()
         .map_err(|e| format!("Failed to find eval root: {}", e))?;
 
+    let in_ci = std::env::var("CI").is_ok();
+
+    let mut args = vec![
+        "build",
+        "--platform=linux/amd64",
+        "-f",
+        "docker/Dockerfile",
+        "-t",
+        "no-seatbelts-eval-env",
+    ];
+
+    // In CI, use --no-cache and --pull to avoid Docker BuildKit snapshot errors
+    // These flags ensure a clean build and fresh base images, preventing
+    // corrupted cache layers that can cause snapshot extraction failures
+    if in_ci {
+        args.push("--no-cache");
+        args.push("--pull");
+    }
+
+    args.push(".");
+
     let status = Command::new("docker")
         .current_dir(&eval_root)
-        .args([
-            "build",
-            "--platform=linux/amd64",
-            "-f",
-            "docker/Dockerfile",
-            "-t",
-            "no-seatbelts-eval-env",
-            ".",
-        ])
+        .args(&args)
         .status()
         .map_err(|e| format!("Failed to run docker build: {}", e))?;
 
