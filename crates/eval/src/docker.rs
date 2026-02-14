@@ -59,7 +59,9 @@ pub fn ensure_docker_image() {
     let in_ci = std::env::var("CI").is_ok();
     let force = std::env::var("EVAL_FORCE_DOCKER_BUILD").is_ok();
 
-    if in_ci || force || !docker_image_exists("no-seatbelts-eval-env") {
+    // In CI, assume the image is already built by a CI step.
+    // Only build locally or when forced.
+    if !in_ci && (force || !docker_image_exists("no-seatbelts-eval-env")) {
         docker_build().expect("Failed to build docker image.");
     }
 }
@@ -170,30 +172,17 @@ fn docker_build() -> Result<(), String> {
     let eval_root = crate::workspace::find_eval_root()
         .map_err(|e| format!("Failed to find eval root: {}", e))?;
 
-    let in_ci = std::env::var("CI").is_ok();
-
-    let mut args = vec![
-        "build",
-        "--platform=linux/amd64",
-        "-f",
-        "docker/Dockerfile",
-        "-t",
-        "no-seatbelts-eval-env",
-    ];
-
-    // In CI, use --no-cache and --pull to avoid Docker BuildKit snapshot errors
-    // These flags ensure a clean build and fresh base images, preventing
-    // corrupted cache layers that can cause snapshot extraction failures
-    if in_ci {
-        args.push("--no-cache");
-        args.push("--pull");
-    }
-
-    args.push(".");
-
     let status = Command::new("docker")
         .current_dir(&eval_root)
-        .args(&args)
+        .args([
+            "build",
+            "--platform=linux/amd64",
+            "-f",
+            "docker/Dockerfile",
+            "-t",
+            "no-seatbelts-eval-env",
+            ".",
+        ])
         .status()
         .map_err(|e| format!("Failed to run docker build: {}", e))?;
 
