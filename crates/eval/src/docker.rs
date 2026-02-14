@@ -12,6 +12,7 @@ pub struct CompileConfig {
     pub target: TargetArch,
     pub bin: Option<String>,
     pub release: bool,
+    pub exclude_std: bool,
 }
 
 /// The architectures you can compile to.
@@ -20,11 +21,13 @@ pub struct CompileConfig {
 pub enum TargetArch {
     I686UnknownLinuxGnu,
     Thumbv7emNoneEabi,
+    X86_64UnknownLinuxGnu,
 }
 
 impl TargetArch {
     pub fn to_rust_target(&self) -> &'static str {
         match self {
+            TargetArch::X86_64UnknownLinuxGnu => "x86_64-unknown-linux-gnu",
             TargetArch::I686UnknownLinuxGnu => "i686-unknown-linux-gnu",
             TargetArch::Thumbv7emNoneEabi => "thumbv7em-none-eabi",
         }
@@ -44,7 +47,9 @@ impl TargetArch {
         let mnemonic = mnemonic(instr);
 
         match self {
-            TargetArch::I686UnknownLinuxGnu => mnemonic.starts_with("call"),
+            TargetArch::X86_64UnknownLinuxGnu | TargetArch::I686UnknownLinuxGnu => {
+                mnemonic.starts_with("call")
+            }
             TargetArch::Thumbv7emNoneEabi => mnemonic.starts_with("bl"),
         }
     }
@@ -87,7 +92,13 @@ pub fn docker_compile(
     args.push("--target");
     args.push(config.target.to_rust_target());
 
-    run_in_docker(mount_dir, &args)?;
+    let env_args = if config.exclude_std {
+        vec!["RUSTFLAGS=-C link-arg=-nostdlib"]
+    } else {
+        vec![]
+    };
+
+    run_in_docker(mount_dir, &args, &env_args)?;
 
     if let Some(elf) = crate::workspace::expected_elf_path(project_dir, config) {
         if !elf.exists() {
@@ -108,23 +119,29 @@ pub fn to_container_path(repo_root: &Path, host_path: &Path) -> String {
     format!("/work/{}", rel.display())
 }
 
-pub fn run_in_docker(mount_dir: &Path, args: &[&str]) -> anyhow::Result<Output> {
+pub fn run_in_docker(mount_dir: &Path, args: &[&str], env_args: &[&str]) -> anyhow::Result<Output> {
     ensure_docker_image();
 
+    let base_env_args = [
+        "CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER=i686-linux-gnu-gcc",
+        "AR=i686-linux-gnu-ar",
+    ];
+
+    let mount_dir_display = &format!("{}:/work", mount_dir.display());
+
+    let mut prelude_args = vec!["run", "--rm", "--platform=linux/amd64"];
+
+    for env_var in base_env_args.iter().chain(env_args) {
+        prelude_args.push("-e");
+        prelude_args.push(env_var);
+    }
+
+    prelude_args.push("-v");
+    prelude_args.push(mount_dir_display);
+    prelude_args.push("no-seatbelts-eval-env");
+
     let output = Command::new("docker")
-        .args([
-            "run",
-            "--rm",
-            "-e",
-            "RUSTFLAGS=-C link-arg=-nostdlib",
-            "-e",
-            "CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER=i686-linux-gnu-gcc",
-            "-e",
-            "AR=i686-linux-gnu-ar",
-            "-v",
-            &format!("{}:/work", mount_dir.display()),
-            "no-seatbelts-eval-env",
-        ])
+        .args(&prelude_args)
         .args(args)
         .output()
         .expect("failed to run docker command");
@@ -157,6 +174,7 @@ fn docker_build() -> Result<(), String> {
         .current_dir(&eval_root)
         .args([
             "build",
+            "--platform=linux/amd64",
             "-f",
             "docker/Dockerfile",
             "-t",

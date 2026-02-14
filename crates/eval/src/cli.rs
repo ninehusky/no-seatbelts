@@ -1,7 +1,7 @@
 use clap::Parser;
 use std::path::PathBuf;
 
-use crate::benchmarks::Benchmark;
+use crate::experiments::Benchmark;
 
 #[derive(Debug, Parser)]
 #[command(name = "eval")]

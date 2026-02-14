@@ -34,6 +34,7 @@ pub fn run() -> Result<()> {
         target: target.clone(),
         bin: Some("ring-buffer-smoketest".to_string()),
         release: true,
+        exclude_std: true,
     };
 
     // 1. EXPERIMENT 1: Compute overall size deltas.

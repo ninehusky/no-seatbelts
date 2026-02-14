@@ -68,7 +68,7 @@ pub fn get_section_size_summary(
 
 fn get_section_sizes(elf: &Path) -> anyhow::Result<SectionSizes> {
     let elf_path = to_container_path(&find_eval_root()?, elf);
-    let output = run_in_docker(&find_eval_root()?, &["llvm-readelf", "-S", &elf_path])?;
+    let output = run_in_docker(&find_eval_root()?, &["llvm-readelf", "-S", &elf_path], &[])?;
 
     parse_readelf_sections(&String::from_utf8_lossy(&output.stdout))
 }

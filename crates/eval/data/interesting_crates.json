@@ -1,0 +1,56 @@
+[
+    {
+        "name": "fd",
+        "exec_name": "fd",
+        "version": "10.3.0",
+        "repository": "https://github.com/sharkdp/fd"
+    },
+    {
+        "name": "ripgrep",
+        "exec_name": "rg",
+        "version": "15.1.0",
+        "repository": "https://github.com/BurntSushi/ripgrep"
+    },
+    {
+        "name": "just",
+        "exec_name": "just",
+        "version": "1.46.0",
+        "repository": "https://github.com/casey/just"
+    },
+    {
+        "name": "bat",
+        "exec_name": "bat",
+        "version": "0.26.1",
+        "repository": "https://github.com/sharkdp/bat"
+    },
+    {
+        "name": "hyperfine",
+        "exec_name": "hyperfine",
+        "version": "1.20.0",
+        "repository": "https://github.com/sharkdp/hyperfine"
+    },
+    {
+        "name": "bottom",
+        "exec_name": "btm",
+        "version": "0.12.3",
+        "repository": "https://github.com/ClementTsang/bottom"
+    },
+    {
+        "name": "zoxide",
+        "exec_name": "zoxide",
+        "version": "0.9.9",
+        "repository": "https://github.com/ajeetdsouza/zoxide"
+    },
+    {
+        "name": "starship",
+        "exec_name": "starship",
+        "version": "1.24.2",
+        "repository": "https://github.com/starship/starship"
+    },
+    {
+        "name": "eza",
+        "exec_name": "eza",
+        "version": "0.23.4",
+        "repository": "https://github.com/eza-community/eza"
+    }
+]
