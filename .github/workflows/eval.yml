@@ -9,6 +9,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Build Docker image
+        working-directory: crates/eval
+        run: docker build --platform=linux/amd64 --no-cache --pull -f docker/Dockerfile -t no-seatbelts-eval-env .
+
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@nightly
 
@@ -27,6 +31,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        working-directory: crates/eval
+        run: docker build --platform=linux/amd64 --no-cache --pull -f docker/Dockerfile -t no-seatbelts-eval-env .
 
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@nightly

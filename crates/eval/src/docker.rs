@@ -57,9 +57,10 @@ impl TargetArch {
 
 pub fn ensure_docker_image() {
     let in_ci = std::env::var("CI").is_ok();
-    let force = std::env::var("EVAL_FORCE_DOCKER_BUILD").is_ok();
 
-    if in_ci || force || !docker_image_exists("no-seatbelts-eval-env") {
+    // In CI, assume the image is already built by a CI step.
+    // Only build locally when the image doesn't exist.
+    if !in_ci && !docker_image_exists("no-seatbelts-eval-env") {
         docker_build().expect("Failed to build docker image.");
     }
 }
