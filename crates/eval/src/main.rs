@@ -24,6 +24,9 @@ fn main() -> anyhow::Result<()> {
         Benchmark::Survey => {
             experiments::survey::run()?;
         }
+        Benchmark::TockBoard => {
+            experiments::tock_board::run()?;
+        }
         _ => unimplemented!(),
     };
     Ok(())
