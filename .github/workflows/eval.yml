@@ -20,7 +20,7 @@ jobs:
       - name: Upload panic metrics
         uses: actions/upload-artifact@v4
         with:
-          name: ring-buffer-panic-metrics
+          name: tock-board-panic-metrics
           path: crates/eval/build/
     
   ringbuffer:
