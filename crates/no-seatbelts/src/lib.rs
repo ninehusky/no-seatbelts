@@ -1,5 +1,6 @@
 #![feature(rustc_private)]
 
+use rustc_lint::{LateLintPass, LintPass};
 use rustc_middle::mir::Body;
 use rustc_session::declare_lint;
 
@@ -7,6 +8,7 @@ extern crate rustc_driver;
 extern crate rustc_errors;
 extern crate rustc_fluent_macro;
 extern crate rustc_hir;
+extern crate rustc_interface;
 extern crate rustc_lint;
 extern crate rustc_macros;
 extern crate rustc_middle;
@@ -26,12 +28,70 @@ declare_lint! {
     "Suggests replacing panic-checking code with its unsafe counterpart."
 }
 
+struct PanicLatePass;
+
+impl LintPass for PanicLatePass {
+    fn name(&self) -> &'static str {
+        "PanicLatePass"
+    }
+
+    fn get_lints(&self) -> rustc_lint::LintVec {
+        rustc_lint::LintVec::from_iter(vec![PANIC_PASS])
+    }
+}
+
+impl<'tcx> LateLintPass<'tcx> for PanicLatePass {
+    fn check_body(&mut self, _: &rustc_lint::LateContext<'tcx>, body: &rustc_hir::Body<'tcx>) {}
+}
+
 pub struct PanicPass {
-    detectors: Vec<Box<dyn detectors::PanicDetector>>,
+    detectors: Vec<Box<dyn detectors::PanicDetector + Send>>,
+}
+
+impl rustc_driver::Callbacks for PanicPass {
+    fn config(&mut self, config: &mut rustc_interface::interface::Config) {
+        config.register_lints = Some(Box::new(|_sess, lint_store| {
+            lint_store.register_lints(&[&PANIC_PASS]);
+            lint_store.register_late_pass(|_| Box::new(PanicLatePass));
+        }))
+    }
+
+    fn after_expansion<'tcx>(
+        &mut self,
+        _compiler: &rustc_interface::interface::Compiler,
+        _tcx: rustc_middle::ty::TyCtxt<'tcx>,
+    ) -> rustc_driver::Compilation {
+        rustc_driver::Compilation::Continue
+    }
+
+    fn after_analysis<'tcx>(
+        &mut self,
+        _compiler: &rustc_interface::interface::Compiler,
+        tcx: rustc_middle::ty::TyCtxt<'tcx>,
+    ) -> rustc_driver::Compilation {
+        // This is the actual area to run the lint pass.
+        for def_id in tcx.mir_keys(()) {
+            let body = tcx.optimized_mir(def_id.to_def_id());
+            self.check_body(&tcx, body);
+        }
+
+        for impl_id in tcx.hir_crate_items(()).impl_items() {
+            let impl_item = tcx.hir_impl_item(impl_id);
+            if let rustc_hir::ImplItemKind::Fn { .. } = impl_item.kind {
+                let def_id = impl_item.hir_id().owner.def_id;
+                if tcx.hir_maybe_body_owned_by(def_id).is_some() {
+                    let body = tcx.optimized_mir(def_id.to_def_id());
+                    self.check_body(&tcx, body);
+                }
+            }
+        }
+
+        rustc_driver::Compilation::Continue
+    }
 }
 
 impl<'tcx> PanicPass {
-    pub fn new(detectors: Vec<Box<dyn detectors::PanicDetector>>) -> Self {
+    pub fn new(detectors: Vec<Box<dyn detectors::PanicDetector + Send>>) -> Self {
         Self { detectors }
     }
 

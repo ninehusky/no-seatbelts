@@ -17,7 +17,7 @@ pub use div_by_zero::DivByZeroDetector;
 pub use explicit_panics::ExplicitPanicDetector;
 pub use slice_access::SliceDetector;
 
-pub trait PanicDetector {
+pub trait PanicDetector: Send {
     fn detect_terminator<'tcx>(
         &self,
         tcx: TyCtxt<'tcx>,
